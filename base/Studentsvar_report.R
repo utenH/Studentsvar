@@ -77,7 +77,7 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
   # sdf <- sdf %>% group_by(Studieprogramkode) %>% filter(arstal_siste %in% gruppe_ar) %>% ungroup
   sdf <- sdf %>% group_by(Studieprogram_instnr) %>% filter(arstal_siste %in% gruppe_ar) %>% ungroup
   
-  surveyinfo <- paste(survey, "indikatorrapport", arstal_siste)
+  surveyinfo <- paste0("Rapportfiler/",survey, " indikatorrapport ", arstal_siste)
   dir.create(surveyinfo)
   
   if (nrow(arstal) > 2) {
