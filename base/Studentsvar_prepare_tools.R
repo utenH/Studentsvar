@@ -132,15 +132,23 @@ library(rdbhapi)
 # Slår saman på programkode, for å legge til programdata frå DBH
 # sdf - dataframe å slå saman med
 # varnamn - variabel i sdf for programkode
-dbh_add_programdata <- function(sdf, varnamn, instnr) {
+# natjoin - set denne til T dersom to tabellar frå DBH skal slås saman
+dbh_add_programdata <- function(sdf, varnamn, instnr, natjoin = F) {
   OM_data <- dbh_hent_programdata(instnr)
+  if (!natjoin) {
   sdf <- left_join(sdf, OM_data,
                    by = setNames("Studieprogramkode", varnamn))
+  } else {
+    # Dersom det er behov for å slå saman tabellar frå DBH, 
+    # ønsker vi å slå saman på alle kolonner som er like
+    sdf <- left_join(sdf, OM_data)
+  }
   sdf <- sdf %>% rename("Studieprogramkode" = {{varnamn}})
   # Om det er Studiebarometer, må vi handtere nokre greier, sjekke her for å kunne kode StudiumID
   if (instnr == 1175 & "STUDIENIVAKODE" %in% colnames(sdf)) {
     sdf <- SB_unntak(sdf)
   }
+  
   sdf <- dbh_add_nivå(sdf)
   sdf <- dbh_add_utdtype(sdf)
   sdf <- dbh_add_progresjon(sdf, `Andel av heltid`)
@@ -205,8 +213,18 @@ dbh_hent_orgdata <- function(instnr) {
   
   # Hentar tabell med fakultetskode og -namn
   # TODO - dei programma som er tilknytt fakultet på høgste nivå, fell utanom her - forsøk å fikse
-  dbh_210 <- dbh_data(210) %>% filter(Institusjonskode == instnr) %>% 
+  dbh_210 <- dbh_data(210) %>% filter(Institusjonskode == instnr) %>%
     select(Fakultetskode, Fakultetsnavn) %>% unique() %>% arrange(Fakultetskode)
+  
+  # Forkorte fakultetsnamn
+  if (instnr == 1175) {
+    dbh_210 <- dbh_210 %>% mutate(Fakultetsnavn = case_when(
+      grepl("HV", Fakultetsnavn) ~ "Fakultet HV",
+      grepl("LUI", Fakultetsnavn) ~ "Fakultet LUI",
+      grepl("SAM", Fakultetsnavn) ~ "Fakultet SAM",
+      grepl("TKD", Fakultetsnavn) ~ "Fakultet TKD"
+    ))
+  }
   
   # Slår saman tabellane for å få med fakultetsnamn
   sdf <- left_join(sdf, dbh_210, by = "Fakultetskode")
@@ -552,6 +570,9 @@ OM_clean_kandidat_serie <- function(sdf) {
   sdf$brutto_arslonn_vasket[sdf$brutto_arslonn <= 300000] <- NA
   sdf$brutto_arslonn_vasket[sdf$brutto_arslonn >= 1200000] <- NA
   
+  # Handterer at det i 2019 vart lagra som fullførtdato i dd.mm.åååå
+  sdf <- sdf %>% mutate(fullfort_dato = str_sub(fullfort_dato, -4))
+  sdf <- sdf %>% mutate(fullfort_ar = coalesce(fullfort_ar, as.numeric(fullfort_dato)))
   return(sdf)
 }
 

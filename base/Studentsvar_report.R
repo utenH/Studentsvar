@@ -284,8 +284,8 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
           df_ut_fakultet <- print_snitt_as_num(sdf_full %>% group_by(Fakultetsnavn), utskriftsmal[rad, "Variabel"], arstal_eldre, arstal_siste)
           df_ut_OM <- print_snitt_as_num(sdf_full %>% group_by(Institusjon), utskriftsmal[rad, "Variabel"], arstal_eldre, arstal_siste)
         } else if (utskriftsmal[rad, "Svartype"] == "fordeling_single") {
-          df_ut_fakultet <- print_fordeling(sdf_full %>% filter(gruppe_ar == arstal_siste) %>% group_by(Fakultet_ar), utskriftsmal[rad, "Variabel"])
-          df_ut_OM <- print_fordeling(sdf_full %>% filter(gruppe_ar == arstal_siste) %>% group_by(OM_ar), utskriftsmal[rad, "Variabel"])
+          df_ut_fakultet <- print_fordeling(sdf_full %>% filter(gruppe_ar == arstal_siste) %>% group_by(Fakultetsnavn), utskriftsmal[rad, "Variabel"])
+          df_ut_OM <- print_fordeling(sdf_full %>% filter(gruppe_ar == arstal_siste) %>% group_by(Institusjon), utskriftsmal[rad, "Variabel"])
         } else if(utskriftsmal[rad, "Svartype"] == "snitt_as_num_single") {
           df_ut_fakultet <- print_snitt_as_num_single(sdf_full %>% group_by(Fakultetsnavn), utskriftsmal[rad, "Variabel"], arstal_siste)
           df_ut_OM <- print_snitt_as_num_single(sdf_full %>% group_by(Institusjon), utskriftsmal[rad, "Variabel"], arstal_siste)
@@ -305,7 +305,7 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
           arbeidsbok,
           sn,
           cols = 1,
-          widths = 85
+          widths = 45
         )
         
         # gjer klar til neste ark
@@ -387,13 +387,13 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
             df_ut <- print_fordeling(sdf_fakultet %>% 
                                        filter(gruppe_ar == arstal_siste,
                                               Institutt == instituttliste[1] | Institutt == instituttliste[2]) %>%
-                                       group_by(Studieprogram_instnr_ar), utskriftsmal[rad, "Variabel"])
+                                       group_by(Studieprogram_instnr), utskriftsmal[rad, "Variabel"])
             df_ut_2 <- print_fordeling(sdf_fakultet %>% 
                                          filter(gruppe_ar == arstal_siste,
                                                 Institutt != instituttliste[1] & Institutt != instituttliste[2]) %>%
-                                         group_by(Studieprogram_instnr_ar), utskriftsmal[rad, "Variabel"])
+                                         group_by(Studieprogram_instnr), utskriftsmal[rad, "Variabel"])
             df_ut_fakultet <- print_fordeling(sdf_fakultet %>% filter(gruppe_ar == arstal_siste) %>% 
-                                                group_by(Fakultet_ar), utskriftsmal[rad, "Variabel"])
+                                                group_by(Fakultetsnavn), utskriftsmal[rad, "Variabel"])
           } else if(utskriftsmal[rad, "Svartype"] == "snitt_as_num_single") {
             # df_ut <- print_snitt_as_num(sdf_fakultet_studieprogramnavn, utskriftsmal[rad, "Variabel"], arstal_eldre, arstal_siste)
             df_ut <- print_snitt_as_num_single(sdf_fakultet_studieprogramnavn %>% 
@@ -443,7 +443,7 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
             arbeidsbok,
             sn,
             cols = 1,
-            widths = 85
+            widths = 45
           )
           
           # gjer klar til neste ark
