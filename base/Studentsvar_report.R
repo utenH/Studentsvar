@@ -295,10 +295,10 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
         }
         
         # Fakultetsnivå
-        writeData(arbeidsbok, sheet = sn, x = df_ut_fakultet, startCol = sc, startRow = sr, colNames = T, keepNA = T, na.string = "")
+        writeData(arbeidsbok, sheet = sn, x = df_ut_fakultet, startCol = sc, startRow = sr, colNames = T, keepNA = T)
         sr <- sr + nrow(df_ut_fakultet) + 1
         # OsloMet-nivå
-        writeData(arbeidsbok, sheet = sn, x = df_ut_OM, startCol = sc, startRow = sr, colNames = F, keepNA = T, na.string = "")
+        writeData(arbeidsbok, sheet = sn, x = df_ut_OM, startCol = sc, startRow = sr, colNames = F, keepNA = T)
         
         # Formater breidde første kolonne
         setColWidths(
@@ -416,12 +416,12 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
           
           # Skriv ut spørsmålstekst til arket
           # Første halvdel av institutta
-          writeData(arbeidsbok, sheet = sn, x = df_ut, startCol = sc, startRow = sr, keepNA = T, na.string = "")
+          writeData(arbeidsbok, sheet = sn, x = df_ut, startCol = sc, startRow = sr, keepNA = T)
           sr <- sr + nrow(df_ut) + 1 
-          writeData(arbeidsbok, sheet = sn, x = df_ut_fakultet, startCol = sc, startRow = sr, colNames = F, keepNA = T, na.string = "")
+          writeData(arbeidsbok, sheet = sn, x = df_ut_fakultet, startCol = sc, startRow = sr, colNames = F, keepNA = T)
           sr <- sr + nrow(df_ut_fakultet)
           # Skriv ikkje ut OsloMet-nivå, berre fakultet
-          # writeData(arbeidsbok, sheet = sn, x = df_ut_OM, startCol = sc, startRow = sr, colNames = F, keepNA = T, na.string = "")
+          # writeData(arbeidsbok, sheet = sn, x = df_ut_OM, startCol = sc, startRow = sr, colNames = F, keepNA = T)
           
           # Andre halvdel av institutta
           if (!is.null(df_ut_2)) {
@@ -430,12 +430,12 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
             df_ut_2 <- df_ut_2 %>% mutate(!!firstColName := gsub("^\\S+\\s", "", .data[[firstColName]]))
             
             sr <- sr + 3
-            writeData(arbeidsbok, sheet = sn, x = df_ut_2, startCol = sc, startRow = sr, keepNA = T, na.string = "")
+            writeData(arbeidsbok, sheet = sn, x = df_ut_2, startCol = sc, startRow = sr, keepNA = T)
             sr <- sr + nrow(df_ut_2) + 1 
-            writeData(arbeidsbok, sheet = sn, x = df_ut_fakultet, startCol = sc, startRow = sr, colNames = F, keepNA = T, na.string = "")
+            writeData(arbeidsbok, sheet = sn, x = df_ut_fakultet, startCol = sc, startRow = sr, colNames = F, keepNA = T)
             sr <- sr + nrow(df_ut_fakultet)
             # Skriv ikkje ut OsloMet-nivå, berre fakultet
-            # writeData(arbeidsbok, sheet = sn, x = df_ut_OM, startCol = sc, startRow = sr, colNames = F, keepNA = T, na.string = "")
+            # writeData(arbeidsbok, sheet = sn, x = df_ut_OM, startCol = sc, startRow = sr, colNames = F, keepNA = T)
           }
           
           # Formater breidde første kolonne
