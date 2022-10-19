@@ -154,7 +154,7 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
       df_ut[x][df_ut[x + 2] < min_svar] <- NA
     }
     # filtrerer bort linjer som ikkje har nok svar siste år
-    df_ut <- df_ut %>% filter(df_ut[ncol(df_ut)] >= min_svar)
+    df_ut <- df_ut %>% filter(df_ut[ncol(df_ut) - 2] >= min_svar)
     
     return(df_ut)
   } # end print_snitt_as_num
