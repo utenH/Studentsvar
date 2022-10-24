@@ -136,8 +136,8 @@ library(rdbhapi)
 dbh_add_programdata <- function(sdf, varnamn, instnr, natjoin = F) {
   OM_data <- dbh_hent_programdata(instnr)
   if (!natjoin) {
-  sdf <- left_join(sdf, OM_data,
-                   by = setNames("Studieprogramkode", varnamn))
+    sdf <- left_join(sdf, OM_data,
+                     by = setNames("Studieprogramkode", varnamn))
   } else {
     # Dersom det er behov for å slå saman tabellar frå DBH, 
     # ønsker vi å slå saman på alle kolonner som er like
@@ -463,7 +463,7 @@ OM_kandidat_setup <- function(sdf) {
   sdf <- set_forventning(sdf, forventning_arbeidsmarked)
   sdf <- set_sektor(sdf, sektor)
   sdf <- set_fylke(sdf, arbeidssted)
-
+  
   sdf <- set_heltidsstilling(sdf, stillingsprosent)
   sdf <- set_ufrivilligdeltid(sdf, grunn_redusert_stilling)  
   sdf <- set_grunn_redusert_stilling(sdf, grunn_redusert_stilling)
@@ -544,6 +544,15 @@ OM_compile_kandidat_data_2022 <- function(path, surveyyear, print = F, filename 
   OM_programvar <- read_excel("base/OsloMet_programvariabler.xlsx")
   sdf <- left_join(sdf, OM_programvar, "Studieprogramkode")
   
+  # Fjernar svar frå kandidatar der det er over tre år sidan dei fullførte, 
+  # for å gi betre samanlikning mellom dei to gruppene
+  sdf <- sdf %>% mutate(ar_fra_ferdig = undersokelse_ar - fullfort_ar)
+  # Må ta vare på dei to fysioterapi-utdanningane, dei har eit år turnus etter fullført
+  sdf <- sdf %>% filter(grepl("fysio", Studieprogramnavn) |
+                          ar_fra_ferdig < 4)
+  # Fjernar program utan fakultet
+  sdf <- sdf %>% filter(!is.na(Fakultetsnavn))
+  
   # Lagar variabel for Studium_ar, Fakultet_ar og OM_ar
   # for å kunne gruppere før utskrift, slik at data kjem på ei linje per år
   sdf <- sdf %>% mutate(Studium_ar = paste(Studieprogramnavn, gruppe_ar))
@@ -558,7 +567,7 @@ OM_compile_kandidat_data_2022 <- function(path, surveyyear, print = F, filename 
     print("Program som ikkje er kopla til fakultet:")
     print(missing_fakultet)
   }
-
+  
   sdf <- OM_kandidat_setup(sdf)
   
   if (print) {
@@ -573,15 +582,10 @@ OM_clean_kandidat_serie <- function(sdf) {
   sdf$fullfort_ar <- sdf$fullfort_ar %>% type.convert("number", as.is = T)
   sdf$undersokelse_ar <- sdf$undersokelse_ar %>% type.convert("number", as.is = T)
   sdf$brutto_arslonn <- sdf$brutto_arslonn %>% type.convert("number", as.is = T)
-
+  
   # Handterer at det i 2019 vart lagra som fullførtdato i dd.mm.åååå
   sdf <- sdf %>% mutate(fullfort_dato = str_sub(fullfort_dato, -4))
   sdf <- sdf %>% mutate(fullfort_ar = coalesce(fullfort_ar, as.numeric(fullfort_dato)))
-  
-  # Fjernar svar frå kandidatar der det er over tre år sidan dei fullførte, 
-  # for å gi betre samanlikning mellom dei to gruppene
-  sdf <- sdf %>% mutate(ar_fra_ferdig = undersokelse_ar - fullfort_ar)
-  sdf <- sdf %>% filter(ar_fra_ferdig < 4)
   
   return(sdf)
 }
@@ -876,8 +880,8 @@ set_tidtiljobbdager <- function(sdf, variabel) {
       {{variabel}} == "Fikk tilbud om relevant jobb mens jeg ennå studerte" |
       {{variabel}} == "Fikk tilbud om relevant jobb mens jeg ennå studerte/var i turnustjeneste" ~ 0,
     {{variabel}} == "Mindre enn en måned etter fullført utdanning" |
-    {{variabel}} == "Mindre enn en måned etter fullført utdanning/turnustjeneste" |
-    {{variabel}} == "Fikk tilbud om relevant jobb mindre enn en måned etter fullført masterutdanning" ~ 15,
+      {{variabel}} == "Mindre enn en måned etter fullført utdanning/turnustjeneste" |
+      {{variabel}} == "Fikk tilbud om relevant jobb mindre enn en måned etter fullført masterutdanning" ~ 15,
     {{variabel}} == "1-2 måneder" ~ 46,
     {{variabel}} == "3-4 måneder" ~ 107,
     {{variabel}} == "5-6 måneder" ~ 168,
@@ -893,7 +897,7 @@ set_tidtiljobbdager <- function(sdf, variabel) {
 set_jobbunderveis <- function(sdf, variabel) {
   sdf <- sdf %>% mutate(hadde_jobb_underveis = case_when(
     {{variabel}} == "Hadde en relevant jobb allerede før jeg ble masterstudent" | 
-    {{variabel}} == "Fikk tilbud om relevant jobb mens jeg ennå studerte" | 
+      {{variabel}} == "Fikk tilbud om relevant jobb mens jeg ennå studerte" | 
       {{variabel}} == "Fikk tilbud om relevant jobb mens jeg ennå studerte/var i turnustjeneste" ~ 1, 
     {{variabel}} != "" ~ 0
   ))
@@ -915,7 +919,7 @@ set_forventning <- function(sdf, variabel) {
 # Lagar variabel skiftetstilling
 set_skiftetstilling <- function(sdf) {
   sdf <- rename(sdf, harduskiftetstillingitidenettera = 
-                        Har.du.skiftet.stilling.i.tiden.etter.at.du.fullførte.masterutdanningen.)
+                  Har.du.skiftet.stilling.i.tiden.etter.at.du.fullførte.masterutdanningen.)
   sdf <- sdf %>% mutate(skiftetstilling = case_when(
     harduskiftetstillingitidenettera=="Ja" ~ 1,
     harduskiftetstillingitidenettera=="Nei" ~ 0
@@ -1004,8 +1008,8 @@ set_fornoydmedoppgaver <- function(sdf, variabel) {
       {{variabel}} == "4" ~ 4,
     {{variabel}} == "Svært fornøyd" | 
       {{variabel}} == "5 - Svært fornøyd" ~ 5,
-      {{variabel}} == "5 - Helt enig" ~ 5,
-      {{variabel}} == "Vet ikke" ~ NaN
+    {{variabel}} == "5 - Helt enig" ~ 5,
+    {{variabel}} == "Vet ikke" ~ NaN
   ))
   # Gjer om variabel til tekst for å kunne gjere om til factor med labels
   var_string <- deparse(substitute(variabel))
@@ -1034,7 +1038,7 @@ set_forberedtforoppgaver <- function(sdf, variabel) {
     {{variabel}} == "Svært godt" | 
       {{variabel}} == "5 - Svært godt" |
       {{variabel}} == "5 - Helt enig" ~ 5,
-      {{variabel}} == "Vet ikke" ~ NaN
+    {{variabel}} == "Vet ikke" ~ NaN
   ))
   # Gjer om variabel til tekst for å kunne gjere om til factor med labels
   var_string <- deparse(substitute(variabel))
@@ -1054,11 +1058,11 @@ label_forberedtforoppgaver <- function(sdf) {
 # Lagar variabel kompetanse_tverrprofesjonelt
 set_kompetanse_tverrprofesjonelt <- function(sdf, variabel) {
   sdf <- sdf %>% mutate({{variabel}} := case_when(
-      {{variabel}} == "1 - Helt uenig" ~ 1,
-      {{variabel}} == "2" ~ 2,
+    {{variabel}} == "1 - Helt uenig" ~ 1,
+    {{variabel}} == "2" ~ 2,
     {{variabel}} == "3" ~ 3,
-      {{variabel}} == "4" ~ 4,
-      {{variabel}} == "5 - Helt enig" ~ 5,
+    {{variabel}} == "4" ~ 4,
+    {{variabel}} == "5 - Helt enig" ~ 5,
     {{variabel}} == "Vet ikke" ~ NaN
   ))
   # Gjer om variabel til tekst for å kunne gjere om til factor med labels
