@@ -497,7 +497,14 @@ OM_kandidat_setup <- function(sdf) {
   sdf <- OM_janei_bin(sdf, arbeidsgiver_finansierer_videreutdanning)
   
   sdf <- set_kjonn(sdf) 
-  sdf <- set_dinalder(sdf) 
+  sdf <- set_dinalder(sdf)
+  
+  sdf <- sdf %>% mutate(brutto_arslonn_vasket = brutto_arslonn)
+  sdf$brutto_arslonn_vasket[sdf$arbeider_utdannet_til != 1] <- NA 
+  sdf$brutto_arslonn_vasket[is.na(sdf$arbeider_utdannet_til)] <- NA 
+  sdf$brutto_arslonn_vasket[sdf$brutto_arslonn < 300000] <- NA 
+  sdf$brutto_arslonn_vasket[sdf$brutto_arslonn > 1000000] <- NA 
+  
   return(sdf)
 }
 
@@ -565,14 +572,17 @@ OM_clean_kandidat_serie <- function(sdf) {
   sdf$siste_side <- sdf$siste_side %>% type.convert("number", as.is = T)
   sdf$fullfort_ar <- sdf$fullfort_ar %>% type.convert("number", as.is = T)
   sdf$undersokelse_ar <- sdf$undersokelse_ar %>% type.convert("number", as.is = T)
-  sdf <- sdf %>% mutate(brutto_arslonn_vasket = brutto_arslonn)
-  sdf$brutto_arslonn_vasket[sdf$arbeider_utdannet_til != "Ja"] <- NA
-  sdf$brutto_arslonn_vasket[sdf$brutto_arslonn <= 300000] <- NA
-  sdf$brutto_arslonn_vasket[sdf$brutto_arslonn >= 1200000] <- NA
-  
+  sdf$brutto_arslonn <- sdf$brutto_arslonn %>% type.convert("number", as.is = T)
+
   # Handterer at det i 2019 vart lagra som fullførtdato i dd.mm.åååå
   sdf <- sdf %>% mutate(fullfort_dato = str_sub(fullfort_dato, -4))
   sdf <- sdf %>% mutate(fullfort_ar = coalesce(fullfort_ar, as.numeric(fullfort_dato)))
+  
+  # Fjernar svar frå kandidatar der det er over tre år sidan dei fullførte, 
+  # for å gi betre samanlikning mellom dei to gruppene
+  sdf <- sdf %>% mutate(ar_fra_ferdig = undersokelse_ar - fullfort_ar)
+  sdf <- sdf %>% filter(ar_fra_ferdig < 4)
+  
   return(sdf)
 }
 
