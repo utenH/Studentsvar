@@ -499,10 +499,17 @@ OM_kandidat_setup <- function(sdf) {
   sdf <- set_kjonn(sdf) 
   sdf <- set_dinalder(sdf)
   
+  sdf <- set_stillingsandel(sdf, stillingsprosent, sammenlagt_stilling)
+  
   sdf <- sdf %>% mutate(brutto_arslonn_vasket = brutto_arslonn)
   sdf$brutto_arslonn_vasket[sdf$arbeider_utdannet_til != 1] <- NA 
-  sdf$brutto_arslonn_vasket[is.na(sdf$arbeider_utdannet_til)] <- NA 
-  sdf$brutto_arslonn_vasket[sdf$brutto_arslonn < 300000] <- NA 
+  sdf$brutto_arslonn_vasket[is.na(sdf$arbeider_utdannet_til)] <- NA
+  sdf$brutto_arslonn_vasket[is.na(sdf$stillingsandel) & sdf$brutto_arslonn < 300000] <- NA 
+  sdf$brutto_arslonn_vasket[sdf$stillingsandel > 0.8 & sdf$brutto_arslonn < 300000] <- NA 
+  sdf$brutto_arslonn_vasket[sdf$stillingsandel == 0.8 & sdf$brutto_arslonn < 240000] <- NA 
+  sdf$brutto_arslonn_vasket[sdf$stillingsandel == 0.6 & sdf$brutto_arslonn < 180000] <- NA 
+  sdf$brutto_arslonn_vasket[sdf$stillingsandel == 0.5 & sdf$brutto_arslonn < 150000] <- NA 
+  sdf$brutto_arslonn_vasket[sdf$stillingsandel == 0.4 & sdf$brutto_arslonn < 120000] <- NA 
   sdf$brutto_arslonn_vasket[sdf$brutto_arslonn > 1000000] <- NA 
   
   return(sdf)
@@ -567,6 +574,9 @@ OM_compile_kandidat_data_2022 <- function(path, surveyyear, print = F, filename 
     print("Program som ikkje er kopla til fakultet:")
     print(missing_fakultet)
   }
+  
+  sdf <- sdf %>% filter(Studieprogramkode != "FAMA", Studieprogramkode != "FMAN", 
+                        Studieprogramkode != "ABY", Studieprogramkode != "YLMKH")
   
   sdf <- OM_kandidat_setup(sdf)
   
@@ -821,6 +831,30 @@ set_relevantforoppgaver <- function(sdf) {
     Hvor.relevant.er.masterutdanningen.for.oppgavene.du.utfører.i.stillingen.din. == "4" ~ "4",
     Hvor.relevant.er.masterutdanningen.for.oppgavene.du.utfører.i.stillingen.din. == "Svært relevant" | 
       Hvor.relevant.er.masterutdanningen.for.oppgavene.du.utfører.i.stillingen.din. == "5 - Svært relevant" ~ "5 - Svært relevant"  
+  ))
+  return(sdf)
+}
+
+# Lagar variabel stillingsandel
+set_stillingsandel <- function(sdf, variabel, sammenlagtvariabel) {
+  sdf <- sdf %>% mutate(stillingsandel = case_when(
+    {{sammenlagtvariabel}} == "Mer enn 100% stilling" |
+      {{sammenlagtvariabel}} == "Mer enn 100%" ~ 1.1,
+    {{variabel}} == "100%" | 
+      {{sammenlagtvariabel}} == "100%" ~ 1,
+    {{variabel}} == "90%" ~ 0.9,
+    {{variabel}} == "80% (tilsvarende 4 dager i uka)" |
+      {{sammenlagtvariabel}} == "80% (tilsvarende 4 dager i uka)" |
+      {{sammenlagtvariabel}} == "80%" ~ 0.8,
+    {{variabel}} == "70 %" ~ 0.7,
+    {{variabel}} == "60% (tilsvarende 3 dager i uka)" |
+      {{sammenlagtvariabel}} == "60% (tilsvarende 3 dager i uka)" ~ 0.6,
+    {{variabel}} == "50%" |
+      {{sammenlagtvariabel}} == "50%" ~ 0.5,
+    {{variabel}} == "Mindre enn 50%" |
+      {{sammenlagtvariabel}} == "Mindre enn 50%" ~ 0.4,
+    {{variabel}} == "Vet ikke" |
+      {{sammenlagtvariabel}} == "Vet ikke" ~ NaN
   ))
   return(sdf)
 }

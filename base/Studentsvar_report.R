@@ -133,15 +133,25 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
         !!kol_siste := mean(as.numeric(.data[[variabel]][gruppe_ar == kol_siste]), na.rm = T),
         !!nkol_eldre := sum(!is.na(.data[[variabel]][gruppe_ar == kol_eldre])),
         !!nkol_siste := sum(!is.na(.data[[variabel]][gruppe_ar == kol_siste])),
-        "p-verdi" = tryCatch(t.test(as.numeric(.data[[variabel]])[gruppe_ar == kol_eldre], 
+        "p_verdi" = tryCatch(t.test(as.numeric(.data[[variabel]])[gruppe_ar == kol_eldre], 
                                     as.numeric(.data[[variabel]][gruppe_ar == kol_siste]),
                                     var.equal = F)$p.value, error = function(e) {return(NA)}, 
-                             silent = TRUE),
-        "N (p)" = sum(!is.na(.data[[variabel]]))
+                             silent = TRUE)
       )
     
+    # Legg til kolonne med * for signifikans
+    df_ut <- df_ut %>% mutate(pstjerne = case_when(
+      p_verdi < 0.001 ~ "***",
+      p_verdi < 0.01 ~ "**",
+      p_verdi < 0.05 ~ "*",
+      T ~ ""
+    ))
+    
     # Legge til kolonne ved å slå saman første kolonne og N-kolonne, fjernar første kolonne
-    df_ut <- df_ut %>% mutate(`Studium / N` = paste0(.data[[grupperingsvariabel]], " (", .data[[nkol_siste]] , "/", .data[[nkol_eldre]], ")"))
+    df_ut <- df_ut %>% mutate(`Studium / N` = 
+                                paste0(.data[[grupperingsvariabel]], 
+                                       " (", .data[[nkol_siste]] , "/", .data[[nkol_eldre]], ")",
+                                       pstjerne))
     df_ut <- df_ut %>% select(-1) %>% relocate(last_col(), 1)
     
     # unngå #NUM! i excel
