@@ -464,7 +464,10 @@ OM_kandidat_setup <- function(sdf) {
   sdf <- set_sektor(sdf, sektor)
   sdf <- set_fylke(sdf, arbeidssted)
   
-  sdf <- set_heltidsstilling(sdf, stillingsprosent)
+  sdf <- set_stillingsandel(sdf, stillingsprosent, sammenlagt_stilling)
+  # sdf <- set_heltidsstilling(sdf, stillingsprosent)
+  sdf <- set_heltidsstilling(sdf, stillingsandel)
+  
   sdf <- set_ufrivilligdeltid(sdf, grunn_redusert_stilling)  
   sdf <- set_grunn_redusert_stilling(sdf, grunn_redusert_stilling)
   
@@ -498,8 +501,6 @@ OM_kandidat_setup <- function(sdf) {
   
   sdf <- set_kjonn(sdf) 
   sdf <- set_dinalder(sdf)
-  
-  sdf <- set_stillingsandel(sdf, stillingsprosent, sammenlagt_stilling)
   
   sdf <- sdf %>% mutate(brutto_arslonn_vasket = brutto_arslonn)
   sdf$brutto_arslonn_vasket[sdf$arbeider_utdannet_til != 1] <- NA 
@@ -859,6 +860,16 @@ set_stillingsandel <- function(sdf, variabel, sammenlagtvariabel) {
   return(sdf)
 }
 
+# Lagar variabel heltidsstilling
+set_heltidsstilling <- function(sdf, variabel) {
+  sdf <- sdf %>% mutate(heltidsstilling = case_when(
+    {{variabel}} >= 1 ~ 1,
+    {{variabel}} < 1 ~ 0,
+    NaN ~ NaN
+  ))
+  return(sdf)
+}
+
 # Lagar variabel stillingsbrøk
 set_stillingsbrøk <- function(sdf) {
   sdf <- sdf %>% mutate(stillingsbrøk = case_when(
@@ -872,15 +883,15 @@ set_stillingsbrøk <- function(sdf) {
   return(sdf)
 }
 
-# Lagar variabel heltidsstilling
-set_heltidsstilling <- function(sdf, variabel) {
-  sdf <- sdf %>% mutate(heltidsstilling = case_when(
-    {{variabel}} == "100%" ~ 1,
-    (!is.na({{variabel}}) & {{variabel}} != "Vet ikke") ~ 0,
-    {{variabel}} == "Vet ikke" ~ NaN
-  ))
-  return(sdf)
-}
+# # Lagar variabel heltidsstilling
+# set_heltidsstilling <- function(sdf, variabel) {
+#   sdf <- sdf %>% mutate(heltidsstilling = case_when(
+#     {{variabel}} == "100%" ~ 1,
+#     (!is.na({{variabel}}) & {{variabel}} != "Vet ikke") ~ 0,
+#     {{variabel}} == "Vet ikke" ~ NaN
+#   ))
+#   return(sdf)
+# }
 
 # Lagar variabel ufrivilligdeltid
 set_ufrivilligdeltid <- function(sdf, variabel) {
