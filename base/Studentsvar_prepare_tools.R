@@ -761,15 +761,15 @@ set_a5_hovedaktivitet <- function(sdf) {
     hovedaktivitet == "Ansatt i vikariat eller annen midlertidig stilling med varighet mer enn 6 måneder" | 
       hovedaktivitet == "Ansatt i vikariat eller annen midlertidig stilling med varighet 6 måneder eller mer" |
       hovedaktivitet == "Ansatt i vikariat eller annen midlertidig stilling med varighet mindre enn 6 måneder" | 
-      hovedaktivitet == "Ansatt i vikariat eller annen midlertidig stilling med kortere varighet enn 6 måneder" 
-    | 
+      hovedaktivitet == "Ansatt i vikariat eller annen midlertidig stilling med kortere varighet enn 6 måneder" | 
       hovedaktivitet == "Midlertidig" |
       hovedaktivitet == "Ansatt i vikariat / midlertidig stilling med varighet 6 måneder eller mer" |
       hovedaktivitet == "Ansatt i vikariat / midlertidig stilling med varighet mindre enn 6 måneder" | 
       hovedaktivitet == "Ansatt i vikariat / midlertidig stilling med kortere varighet enn 6 måneder" ~ "2-Midlertidig stilling",
     hovedaktivitet == "Selvstendig næringsdrivende" ~ "3-Selvstendig næringsdrivende",
     hovedaktivitet == "Arbeidssøkende"	~ "4-Arbeidssøkende",
-    hovedaktivitet == "Annet" ~ "5-Annet"
+    hovedaktivitet == "Student" ~ "5-Studerer"
+    # hovedaktivitet == "Annet" ~ "5-Annet"
   )) 
   return(sdf)
 }
