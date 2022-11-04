@@ -455,9 +455,7 @@ skrivvar <- function(sdf, variabel) {
 }
 
 ##** Kandidatundersøkinga 2022 - forbered data
-OM_kandidat_setup <- function(sdf) {
-  sdf <- OM_set_faktor(sdf, studerer_niva)
-  sdf <- set_a5_hovedaktivitet(sdf)
+OM_kandidat_setup_2022 <- function(sdf) {
   sdf <- OM_janei_bin(sdf, arbeider_utdannet_til)
   sdf <- set_grunn_annet_arbeid(sdf, grunn_annet_arbeid)
   sdf <- set_forventning(sdf, forventning_arbeidsmarked)
@@ -470,6 +468,13 @@ OM_kandidat_setup <- function(sdf) {
   
   sdf <- set_ufrivilligdeltid(sdf, grunn_redusert_stilling)  
   sdf <- set_grunn_redusert_stilling(sdf, grunn_redusert_stilling)
+  
+  # Nokre svar kan rekodast basert på fritekstsvar
+  sdf <- OM_rekode_2022(sdf)
+  
+  sdf <- set_a5_hovedaktivitet(sdf)
+  
+  sdf <- OM_set_faktor(sdf, studerer_niva)
   
   sdf <- OM_janei_bin(sdf, flere_arbeidsgivere)
   
@@ -545,13 +550,25 @@ OM_compile_kandidat_data_2022 <- function(path, surveyyear, print = F, filename 
   # Hentar programnamn frå dbh
   sdf <- sdf %>% dbh_add_programdata("fs_kode", 1175)
   # TODO pass på programma som ikkje blir fanga opp med rett fakultet (2019)
+  
   # Gruppere år i to
-  sdf <- sdf %>% mutate(gruppe_ar = ifelse(undersokelse_ar < 2022, 2019, undersokelse_ar))
+  sdf <- sdf %>% mutate(gruppe_ar = ifelse(undersokelse_ar < 2022, "2018/2019", undersokelse_ar))
   
   # legg til programnamn med instituttilhøyrigheit
   OM_programvar <- read_excel("base/OsloMet_programvariabler.xlsx")
   sdf <- left_join(sdf, OM_programvar, "Studieprogramkode")
   
+  # # Gir så store utslag at dei ikkje skal vere med i felles rapport
+  sdf <- sdf %>% filter(`_fs_kode` != "SKUT-MA" | is.na(`_fs_kode` != "SKUT-MA"))
+
+  # Desse gir så ulike resultat at dei må handterast som ulike program.
+  sdf <- sdf %>% mutate(Studieprogram_instnr = case_when(
+    Studieprogramkode == "ESTDTK-BA" & `_fs_kode` == "PPUDTK" ~ paste(Studieprogram_instnr, "m. PPU"),
+    T ~ Studieprogram_instnr
+  ))
+  
+  ##** 
+  ##* Rydding og omkoding av data
   # Fjernar svar frå kandidatar der det er over tre år sidan dei fullførte, 
   # for å gi betre samanlikning mellom dei to gruppene
   sdf <- sdf %>% mutate(ar_fra_ferdig = undersokelse_ar - fullfort_ar)
@@ -579,7 +596,9 @@ OM_compile_kandidat_data_2022 <- function(path, surveyyear, print = F, filename 
   sdf <- sdf %>% filter(Studieprogramkode != "FAMA", Studieprogramkode != "FMAN", 
                         Studieprogramkode != "ABY", Studieprogramkode != "YLMKH")
   
-  sdf <- OM_kandidat_setup(sdf)
+  #**
+  
+  sdf <- OM_kandidat_setup_2022(sdf)
   
   if (print) {
     write.xlsx(sdf, filename)
@@ -769,7 +788,7 @@ set_a5_hovedaktivitet <- function(sdf) {
       hovedaktivitet == "Ansatt i vikariat / midlertidig stilling med kortere varighet enn 6 måneder" ~ "2-Midlertidig stilling",
     hovedaktivitet == "Selvstendig næringsdrivende" ~ "3-Selvstendig næringsdrivende",
     hovedaktivitet == "Arbeidssøkende"	~ "4-Arbeidssøkende",
-    hovedaktivitet == "Student" ~ "5-Studerer"
+    hovedaktivitet == "Student" ~ "5-Student"
     # hovedaktivitet == "Annet" ~ "5-Annet"
   )) 
   return(sdf)
@@ -817,6 +836,10 @@ set_dinalder <- function(sdf) {
     alder == "7" ~ 39,
     alder == "8" ~ 42
   ))
+  
+  # Endrar aldersvariabel for å få alder då dei fullførte utdanninga
+  sdf <- sdf %>% mutate(alder_int = alder_int - ar_fra_ferdig)
+  
   return(sdf)
 }
 
@@ -865,7 +888,7 @@ set_heltidsstilling <- function(sdf, variabel) {
   sdf <- sdf %>% mutate(heltidsstilling = case_when(
     {{variabel}} >= 1 ~ 1,
     {{variabel}} < 1 ~ 0,
-    NaN ~ NaN
+    T ~ {{variabel}}
   ))
   return(sdf)
 }
@@ -1313,6 +1336,80 @@ SA_text_to_numerallevels_nyvar <- function(sdf, nyvar, originalvar) {
     {{originalvar}} == "I have not carried out any external practical training" ~ NaN,
     {{originalvar}} == "I do not know" ~ NaN
   ))
+}
+
+# Rekodar nokre svar der fritekst viser at dei kunne svart innanfor kategoriane
+OM_rekode_2022 <- function(sdf) {
+  # print(paste("hovedakt annet", sdf %>% filter(hovedaktivitet == "Annet") %>% count))
+  sdf <- sdf %>% mutate(hovedaktivitet = case_when(
+    hovedaktivitet_fritekst == "Ansatt fast 100% + student 50%" & undersokelse_ar == 2018 ~ "Ansatt i fast stilling",
+    hovedaktivitet_fritekst == "Ansatt i fast full jobb med deltidsstudier i et mastergradsprogramm" & undersokelse_ar == 2019 ~ "Ansatt i fast stilling",
+    hovedaktivitet_fritekst == "Jeg har begynt på en master men har tatt permisjon og jobber nå som pedagogisk leder fast 100 %" & undersokelse_ar == 2018 ~ "Ansatt i fast stilling",
+    hovedaktivitet_fritekst == "50% fast, men søker ny arbeidsplass" & undersokelse_ar == 2019 ~ "Ansatt i fast stilling",
+    hovedaktivitet_fritekst == "Ansatt i fast deltid stilling" & undersokelse_ar == 2019 ~ "Ansatt i fast stilling",
+    hovedaktivitet_fritekst == "Ansatt i fast stilling, men ikke 100%" & undersokelse_ar == 2022 ~ "Ansatt i fast stilling",
+    hovedaktivitet_fritekst == "er i et 50% vikariat nå, men tilbudt 100% fast stilling på samme avdeling, fra august 2018. har takket ja til denne" & undersokelse_ar == 2018 ~ "Midlertidig",
+    hovedaktivitet_fritekst == "Fast ansatt i mindre stillinger" & undersokelse_ar == 2019 ~ "Ansatt i fast stilling",
+    hovedaktivitet_fritekst == "Jobber i en deltidsfast stilling som ikke er relevant for ingeniør utdanningen min." & undersokelse_ar == 2018 ~ "Ansatt i fast stilling",
+    hovedaktivitet_fritekst == "Jobber en tilnærmet 80% stilling men har ikke noe fast da jeg ikke er sikker på hva jeg skal eller hvor jeg skal være." & undersokelse_ar == 2018 ~ "Midlertidig",
+    hovedaktivitet_fritekst == "30%fast og 70% midlertidig" & undersokelse_ar == 2022 ~ "Midlertidig",
+    hovedaktivitet_fritekst == "63% fast og 32% vikariat ( varighet 6mnd eller mer)" & undersokelse_ar == 2018 ~ "Ansatt i fast stilling",
+    hovedaktivitet_fritekst == "70% fast stilling + 100% vikariat ved siden av med varighet over ett år." & undersokelse_ar == 2022 ~ "Ansatt i fast stilling",
+    hovedaktivitet_fritekst == "80 fast og 20 vikariat" & undersokelse_ar == 2018 ~ "Ansatt i fast stilling",
+    hovedaktivitet_fritekst == "Ansatt i fast stilling, men ikke som sykepleier" & undersokelse_ar == 2018 ~ "Ansatt i fast stilling",
+    hovedaktivitet_fritekst == "Ansatt i midlertidig stilling, men fast stilling fra høsten" & undersokelse_ar == 2018 ~ "Midlertidig",
+    hovedaktivitet_fritekst == "Arbeidsledig" & undersokelse_ar == 2019 ~ "Arbeidssøkende",
+    hovedaktivitet_fritekst == "Arbeidsløs" & undersokelse_ar == 2022 ~ "Arbeidssøkende",
+    hovedaktivitet_fritekst == "Arbeidssøkende og tilkallingsvikar, timebasert" & undersokelse_ar == 2019 ~ "Arbeidssøkende",
+    hovedaktivitet_fritekst == "Arbeidssøkende+selvstendig næringsdrivende, tilkallingsvikar x 2" & undersokelse_ar == 2022 ~ "Arbeidssøkende",
+    hovedaktivitet_fritekst == "Fast ansatt  &  selvstendig næringsdrivende" & undersokelse_ar == 2019 ~ "Ansatt i fast stilling",
+    hovedaktivitet_fritekst == "Fast ansatt 100% og fulltids masterstudent" & undersokelse_ar == 2022 ~ "Ansatt i fast stilling",
+    hovedaktivitet_fritekst == "Fast ansatt i tillegg til ekstravakt stilling." & undersokelse_ar == 2022 ~ "Ansatt i fast stilling",
+    hovedaktivitet_fritekst == "Fast ansatt og masterstudent." & undersokelse_ar == 2018 ~ "Ansatt i fast stilling",
+    hovedaktivitet_fritekst == "Har både fast stilling 50% og vikariat 25%" & undersokelse_ar == 2022 ~ "Ansatt i fast stilling",
+    hovedaktivitet_fritekst == "Jeg går et masterstudium, som er ferdig nå i juni. Jobber deltid ved siden av." & undersokelse_ar == 2022 ~ "Student",
+    hovedaktivitet_fritekst == "Masterstudent (heltid). Studentmedarbeider i kommunikasjon (deltid)." & undersokelse_ar == 2022 ~ "Student",
+    hovedaktivitet_fritekst == "Masterstudent med deltidsjobb på sykehus" & undersokelse_ar == 2022 ~ "Student",
+    hovedaktivitet_fritekst == "Masterstudent og deltidsansatt" & undersokelse_ar == 2019 ~ "Student",
+    hovedaktivitet_fritekst == "Masterstudent ved OsloMet med vikarstilling som lærer ved siden av studiet." & undersokelse_ar == 2022 ~ "Student",
+    hovedaktivitet_fritekst == "studerer også en videreutdanning" & undersokelse_ar == 2018 ~ "Student",
+    hovedaktivitet_fritekst == "Studerer til å bli sykepleier" & undersokelse_ar == 2022 ~ "Student",
+    hovedaktivitet_fritekst == "Sykemeldt fra fast stilling" & undersokelse_ar == 2018 ~ "Ansatt i fast stilling",
+    hovedaktivitet_fritekst == "Vikariat og masterstudent" & undersokelse_ar == 2018 ~ "Student",
+    hovedaktivitet_fritekst == "Vikariat, men inn i fast stilling høst 2018" & undersokelse_ar == 2018 ~ "Midlertidig",
+    hovedaktivitet_fritekst == "Fast ansatt & selvstendig næringsdrivende" & undersokelse_ar == 2019 ~ "Ansatt i fast stilling",
+    T ~ hovedaktivitet))
+  # print(sdf %>% filter(hovedaktivitet == "Annet") %>% count)
+  
+  # print(paste("stillingsandel NA", sdf %>% filter(is.na(stillingsandel)) %>% count))
+  sdf <- sdf %>% mutate(stillingsandel = case_when(
+    hovedaktivitet_fritekst == "Ansatt fast 100% + student 50%" & undersokelse_ar == 2018 ~ 1,
+    hovedaktivitet_fritekst == "Ansatt i fast full jobb med deltidsstudier i et mastergradsprogramm" & undersokelse_ar == 2019 ~ 1,
+    hovedaktivitet_fritekst == "Jeg har begynt på en master men har tatt permisjon og jobber nå som pedagogisk leder fast 100 %" & undersokelse_ar == 2018 ~ 1,
+    hovedaktivitet_fritekst == "50% fast, men søker ny arbeidsplass" & undersokelse_ar == 2019 ~ 0.5,
+    hovedaktivitet_fritekst == "Ansatt i fast deltid stilling" & undersokelse_ar == 2019 ~ 0.5,
+    hovedaktivitet_fritekst == "Ansatt i fast stilling, men ikke 100%" & undersokelse_ar == 2022 ~ 0.5,
+    hovedaktivitet_fritekst == "er i et 50% vikariat nå, men tilbudt 100% fast stilling på samme avdeling, fra august 2018. har takket ja til denne" & undersokelse_ar == 2018 ~ 0.5,
+    hovedaktivitet_fritekst == "Fast ansatt i mindre stillinger" & undersokelse_ar == 2019 ~ 0.5,
+    hovedaktivitet_fritekst == "Jobber i en deltidsfast stilling som ikke er relevant for ingeniør utdanningen min." & undersokelse_ar == 2018 ~ 0.5,
+    hovedaktivitet_fritekst == "Jobber en tilnærmet 80% stilling men har ikke noe fast da jeg ikke er sikker på hva jeg skal eller hvor jeg skal være." & undersokelse_ar == 2018 ~ 0.8,
+    T ~ stillingsandel))
+  # print(sdf %>% filter(is.na(stillingsandel)) %>% count)
+  
+  # print(paste("studerer_niva NA", sdf %>% filter(is.na(studerer_niva)) %>% count))
+  sdf <- sdf %>% mutate(studerer_niva = case_when(
+    # hovedaktivitet_fritekst == "studerer også en videreutdanning" & undersokelse_ar == 2018 ~ "Annet",
+    hovedaktivitet_fritekst == "Studerer til å bli sykepleier" & undersokelse_ar == 2022 ~ "Bachelor",
+    hovedaktivitet_fritekst == "Jeg går et masterstudium, som er ferdig nå i juni. Jobber deltid ved siden av." & undersokelse_ar == 2022 ~ "Master",
+    hovedaktivitet_fritekst == "Masterstudent (heltid). Studentmedarbeider i kommunikasjon (deltid)." & undersokelse_ar == 2022 ~ "Master",
+    hovedaktivitet_fritekst == "Masterstudent med deltidsjobb på sykehus" & undersokelse_ar == 2022 ~ "Master",
+    hovedaktivitet_fritekst == "Masterstudent og deltidsansatt" & undersokelse_ar == 2019 ~ "Master",
+    hovedaktivitet_fritekst == "Masterstudent ved OsloMet med vikarstilling som lærer ved siden av studiet." & undersokelse_ar == 2022 ~ "Master",
+    hovedaktivitet_fritekst == "Vikariat og masterstudent" & undersokelse_ar == 2018 ~ "Master",
+    T ~ studerer_niva))
+  # print(sdf %>% filter(is.na(studerer_niva)) %>% count)
+  
+  return(sdf)
 }
 
 ##**
