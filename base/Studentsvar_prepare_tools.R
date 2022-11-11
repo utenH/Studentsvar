@@ -174,7 +174,6 @@ dbh_add_programnavn <- function(sdf, varnamn) {
 
 ##**
 ##* Hentar data frå DBH, til å slå saman med andre datasett 
-#* TODO - denne må skrivast om for bruk på rshiny - slik at institusjonskode blir valt frå utfyllinga
 dbh_hent_programdata <- function(instnr = "1175") {
   dbh_vars <- c("Studieprogramkode", 
                 "Studieprogramnavn",
@@ -310,7 +309,6 @@ dbh_hent_studiepoengdata <- function(institusjonsnummer) {
 # OM_fakultetskode
 OM_add_programdata <- function(sdf, varnamn) {
   # TODO: Start å bruke OM_programkode i staden for studieprogramkode/studprog_kod?
-  # mappesti <- "C:/Users/kyrremat/OneDrive - OsloMet/Dokumenter/statistikk/R felles/"
   OM_data <- read.xlsx("../R felles/OM_programdata.xlsx")
   sdf <- left_join(sdf, OM_data,
                    by = setNames("OM_programkode", varnamn))
@@ -456,24 +454,30 @@ skrivvar <- function(sdf, variabel) {
 
 ##** Kandidatundersøkinga 2022 - forbered data
 OM_kandidat_setup_2022 <- function(sdf) {
+  # Nokre svar kan rekodast basert på fritekstsvar
+  sdf <- OM_rekode_2022_hovedaktivitet(sdf)  
+  sdf <- set_a5_hovedaktivitet(sdf)
   sdf <- OM_janei_bin(sdf, arbeider_utdannet_til)
   sdf <- set_grunn_annet_arbeid(sdf, grunn_annet_arbeid)
+  
   sdf <- set_forventning(sdf, forventning_arbeidsmarked)
+
   sdf <- set_sektor(sdf, sektor)
   sdf <- set_fylke(sdf, arbeidssted)
   
   sdf <- set_stillingsandel(sdf, stillingsprosent, sammenlagt_stilling)
-  # sdf <- set_heltidsstilling(sdf, stillingsprosent)
+  # Nokre svar kan rekodast basert på fritekstsvar
+  sdf <- OM_rekode_2022_stillingsandel(sdf)
+  
   sdf <- set_heltidsstilling(sdf, stillingsandel)
+  # Nokre svar kan rekodast basert på fritekstsvar
+  sdf <- set_deltidsstilling(sdf, stillingsandel)
   
   sdf <- set_ufrivilligdeltid(sdf, grunn_redusert_stilling)  
   sdf <- set_grunn_redusert_stilling(sdf, grunn_redusert_stilling)
   
   # Nokre svar kan rekodast basert på fritekstsvar
-  sdf <- OM_rekode_2022(sdf)
-  
-  sdf <- set_a5_hovedaktivitet(sdf)
-  
+  sdf <- OM_rekode_2022_studerer_niva(sdf)
   sdf <- OM_set_faktor(sdf, studerer_niva)
   
   sdf <- OM_janei_bin(sdf, flere_arbeidsgivere)
@@ -872,6 +876,7 @@ set_stillingsandel <- function(sdf, variabel, sammenlagtvariabel) {
       {{sammenlagtvariabel}} == "80%" ~ 0.8,
     {{variabel}} == "70 %" ~ 0.7,
     {{variabel}} == "60% (tilsvarende 3 dager i uka)" |
+      {{sammenlagtvariabel}} == "60%" |
       {{sammenlagtvariabel}} == "60% (tilsvarende 3 dager i uka)" ~ 0.6,
     {{variabel}} == "50%" |
       {{sammenlagtvariabel}} == "50%" ~ 0.5,
@@ -888,6 +893,16 @@ set_heltidsstilling <- function(sdf, variabel) {
   sdf <- sdf %>% mutate(heltidsstilling = case_when(
     {{variabel}} >= 1 ~ 1,
     {{variabel}} < 1 ~ 0,
+    T ~ {{variabel}}
+  ))
+  return(sdf)
+}
+
+# Lagar variabel deltidsstilling
+set_deltidsstilling <- function(sdf, variabel) {
+  sdf <- sdf %>% mutate(deltidsstilling = case_when(
+    {{variabel}} >= 1 ~ 0,
+    {{variabel}} < 1 ~ 1,
     T ~ {{variabel}}
   ))
   return(sdf)
@@ -1338,8 +1353,10 @@ SA_text_to_numerallevels_nyvar <- function(sdf, nyvar, originalvar) {
   ))
 }
 
-# Rekodar nokre svar der fritekst viser at dei kunne svart innanfor kategoriane
-OM_rekode_2022 <- function(sdf) {
+##** Rekodar nokre svar der fritekst viser at dei kunne svart innanfor kategoriane
+##* 
+##* hovedaktivitet
+OM_rekode_2022_hovedaktivitet <- function(sdf) {
   # print(paste("hovedakt annet", sdf %>% filter(hovedaktivitet == "Annet") %>% count))
   sdf <- sdf %>% mutate(hovedaktivitet = case_when(
     hovedaktivitet_fritekst == "Ansatt fast 100% + student 50%" & undersokelse_ar == 2018 ~ "Ansatt i fast stilling",
@@ -1381,6 +1398,11 @@ OM_rekode_2022 <- function(sdf) {
     T ~ hovedaktivitet))
   # print(sdf %>% filter(hovedaktivitet == "Annet") %>% count)
   
+  return(sdf)
+}
+
+#* stillingsandel
+OM_rekode_2022_stillingsandel <- function(sdf) {
   # print(paste("stillingsandel NA", sdf %>% filter(is.na(stillingsandel)) %>% count))
   sdf <- sdf %>% mutate(stillingsandel = case_when(
     hovedaktivitet_fritekst == "Ansatt fast 100% + student 50%" & undersokelse_ar == 2018 ~ 1,
@@ -1396,6 +1418,11 @@ OM_rekode_2022 <- function(sdf) {
     T ~ stillingsandel))
   # print(sdf %>% filter(is.na(stillingsandel)) %>% count)
   
+  return(sdf)
+}
+
+#* studerer_niva
+OM_rekode_2022_studerer_niva <- function(sdf) {
   # print(paste("studerer_niva NA", sdf %>% filter(is.na(studerer_niva)) %>% count))
   sdf <- sdf %>% mutate(studerer_niva = case_when(
     # hovedaktivitet_fritekst == "studerer også en videreutdanning" & undersokelse_ar == 2018 ~ "Annet",
@@ -1411,6 +1438,7 @@ OM_rekode_2022 <- function(sdf) {
   
   return(sdf)
 }
+#* Ferdig med spesialisert omkoding basert på fritekst
 
 ##**
 ##* Variabellister brukt til å bygge indeksar i Studiebarometeret
