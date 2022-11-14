@@ -75,9 +75,13 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
   
   # Filtrerer bort program som ikkje er med i siste datasett
   # sdf <- sdf %>% group_by(Studieprogramkode) %>% filter(arstal_siste %in% gruppe_ar) %>% ungroup
-  # sdf <- sdf %>% group_by(Studieprogram_instnr) %>% filter(arstal_siste %in% gruppe_ar) %>% ungroup
   # Justert denne for å kunne ha gruppe_ar på forma "2018/2019"
-  sdf <- sdf %>% group_by(Studieprogram_instnr) %>% filter(grepl(arstal_siste, gruppe_ar)) %>% ungroup
+  # print("Før")
+  # print(sdf %>% nrow)
+  # sdf <- sdf %>% group_by(Studieprogram_instnr) %>% filter(grepl(arstal_siste, gruppe_ar)) %>% ungroup
+  sdf <- sdf %>% group_by(Studieprogram_instnr) %>% filter(arstal_siste %in% gruppe_ar) %>% ungroup
+  # print("Etter")
+  # print(sdf %>% nrow)
   
   surveyinfo <- paste0("Rapportfiler/",survey, " indikatorrapport ", arstal_siste)
   dir.create(surveyinfo)
