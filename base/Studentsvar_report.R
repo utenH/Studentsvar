@@ -145,6 +145,10 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
                              silent = TRUE)
       )
     
+    if (variabel == "brutto_arslonn_vasket") {
+      df_ut <- df_ut %>% mutate(across(c(2, 3), round, -3))
+    }
+    
     # Legg til kolonne med * for signifikans
     df_ut <- df_ut %>% mutate(pstjerne = case_when(
       p_verdi < 0.001 ~ "***",
@@ -189,6 +193,10 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
         !!kol_siste := mean(as.numeric(.data[[variabel]][gruppe_ar == kol_siste]), na.rm = T),
         !!nkol_siste := sum(!is.na(.data[[variabel]][gruppe_ar == kol_siste]))
       )
+    
+    if (variabel == "brutto_arslonn_vasket") {
+      df_ut <- df_ut %>% mutate(across(c(2), round, -3))
+    }
     
     # Legge til kolonne ved å slå saman første kolonne og N-kolonne, fjernar første kolonne
     df_ut <- df_ut %>% mutate(`Studium / N` = paste0(.data[[grupperingsvariabel]], " (", .data[[nkol_siste]] , ")"))

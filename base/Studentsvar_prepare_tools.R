@@ -478,7 +478,7 @@ OM_kandidat_setup_2022 <- function(sdf) {
   
   # Nokre svar kan rekodast basert på fritekstsvar
   sdf <- OM_rekode_2022_studerer_niva(sdf)
-  sdf <- OM_set_faktor(sdf, studerer_niva)
+  sdf <- OM_set_faktor_studerer_niva(sdf)
   
   sdf <- OM_janei_bin(sdf, flere_arbeidsgivere)
   
@@ -710,7 +710,9 @@ set_sektor <- function(sdf, variabel) {
     {{variabel}} == "Frivillig (ideell) organisasjon" | 
       {{variabel}} == "Frivillig sektor" ~ "Frivillig"
   )) 
-  sdf$sektor <- sdf$sektor %>% as.factor
+  # sdf$sektor <- sdf$sektor %>% as.factor
+  # Endra for å sette rekkefølgja betre
+  sdf$sektor <- factor(sdf$sektor, levels = c("Kommunal", "Fylkeskommunal", "Statlig", "Privat", "Frivillig"))
   return(sdf)
 }
 
@@ -981,7 +983,8 @@ set_jobbunderveis <- function(sdf, variabel) {
   sdf <- sdf %>% mutate(hadde_jobb_underveis = case_when(
     {{variabel}} == "Hadde en relevant jobb allerede før jeg ble masterstudent" | 
       {{variabel}} == "Fikk tilbud om relevant jobb mens jeg ennå studerte" | 
-      {{variabel}} == "Fikk tilbud om relevant jobb mens jeg ennå studerte/var i turnustjeneste" ~ 1, 
+      {{variabel}} == "Fikk tilbud om relevant jobb mens jeg ennå studerte/var i turnustjeneste" ~ 1,
+    {{variabel}} == "Husker ikke" ~ NaN, 
     {{variabel}} != "" ~ 0
   ))
   return(sdf)
@@ -1243,6 +1246,13 @@ OM_set_faktor <- function(sdf, svar) {
   return(sdf)
 }
 
+# Kodar om til faktor
+OM_set_faktor_studerer_niva <- function(sdf) {
+  # sdf$studerer_niva <- factor(sdf$studerer_niva, levels = c("Bachelor", "Master", "Ph.d.", "Annet"))
+  sdf$studerer_niva <- factor(sdf$studerer_niva, levels = c("Bachelor", "Master", "Annet"))
+  return(sdf)
+}
+
 ##** Kodar om ja/nei/usikker til binærvariabel
 ##*  Ja = 1
 ##*  Nei = 0
@@ -1433,6 +1443,7 @@ OM_rekode_2022_studerer_niva <- function(sdf) {
     hovedaktivitet_fritekst == "Masterstudent og deltidsansatt" & undersokelse_ar == 2019 ~ "Master",
     hovedaktivitet_fritekst == "Masterstudent ved OsloMet med vikarstilling som lærer ved siden av studiet." & undersokelse_ar == 2022 ~ "Master",
     hovedaktivitet_fritekst == "Vikariat og masterstudent" & undersokelse_ar == 2018 ~ "Master",
+    studerer_niva == "Ph.D." ~ "Annet",
     T ~ studerer_niva))
   # print(sdf %>% filter(is.na(studerer_niva)) %>% count)
   
