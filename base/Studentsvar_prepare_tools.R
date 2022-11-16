@@ -459,6 +459,7 @@ OM_kandidat_setup_2022 <- function(sdf) {
   sdf <- set_a5_hovedaktivitet(sdf)
   sdf <- OM_janei_bin(sdf, arbeider_utdannet_til)
   sdf <- set_grunn_annet_arbeid(sdf, grunn_annet_arbeid)
+  sdf <- OM_set_faktor(sdf, grunn_annet_arbeid)
   
   sdf <- set_forventning(sdf, forventning_arbeidsmarked)
 
