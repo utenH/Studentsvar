@@ -459,7 +459,6 @@ OM_kandidat_setup_2022 <- function(sdf) {
   sdf <- set_a5_hovedaktivitet(sdf)
   sdf <- OM_janei_bin(sdf, arbeider_utdannet_til)
   sdf <- set_grunn_annet_arbeid(sdf, grunn_annet_arbeid)
-  sdf <- OM_set_faktor(sdf, grunn_annet_arbeid)
   
   sdf <- set_forventning(sdf, forventning_arbeidsmarked)
 
@@ -485,6 +484,7 @@ OM_kandidat_setup_2022 <- function(sdf) {
   
   sdf <- set_tidtiljobbdager(sdf, tid_til_relevant_arbeid)
   sdf <- set_jobbunderveis(sdf, tid_til_relevant_arbeid)
+  sdf <- set_lang_tid_til_relevant_arbeid(sdf, tid_til_relevant_arbeid)
   
   sdf <- set_fornoydmedoppgaver(sdf, fornoyd_oppgaver)
   sdf <- set_forberedtforoppgaver(sdf, forberedt_oppgaver)
@@ -977,6 +977,7 @@ set_tidtiljobbdager <- function(sdf, variabel) {
     {{variabel}} == "Mer enn to år" ~ 765,
     {{variabel}} == "Husker ikke" ~ NaN
   ))
+  return(sdf)
 }
 
 # Lagar variabel haddejobbunderveis
@@ -987,6 +988,27 @@ set_jobbunderveis <- function(sdf, variabel) {
       {{variabel}} == "Fikk tilbud om relevant jobb mens jeg ennå studerte/var i turnustjeneste" ~ 1,
     {{variabel}} == "Husker ikke" ~ NaN, 
     {{variabel}} != "" ~ 0
+  ))
+  return(sdf)
+}
+
+# Lagar variabel for meir enn 6 mnd til relevant arbeid
+set_lang_tid_til_relevant_arbeid <- function(sdf, variabel) {
+  sdf <- sdf %>% mutate(lang_tid_til_relevant_arbeid = case_when(
+    {{variabel}} == "Fikk tilbud om relevant jobb mens jeg ennå var masterstudent" |
+      {{variabel}} == "Fikk tilbud om relevant jobb mens jeg ennå studerte" |
+      {{variabel}} == "Fikk tilbud om relevant jobb mens jeg ennå studerte/var i turnustjeneste" |
+    {{variabel}} == "Mindre enn en måned etter fullført utdanning" |
+      {{variabel}} == "Mindre enn en måned etter fullført utdanning/turnustjeneste" |
+      {{variabel}} == "Fikk tilbud om relevant jobb mindre enn en måned etter fullført masterutdanning" |
+    {{variabel}} == "1-2 måneder" |
+    {{variabel}} == "3-4 måneder" |
+    {{variabel}} == "5-6 måneder" ~ 0,
+    {{variabel}} == "7-12 måneder" |
+    {{variabel}} == "13-18 måneder" |
+    {{variabel}} == "19-24 måneder" |
+    {{variabel}} == "Mer enn to år" ~ 1,
+    {{variabel}} == "Husker ikke" ~ NaN
   ))
   return(sdf)
 }
@@ -1049,7 +1071,6 @@ label_nødvendigmaster <- function(sdf) {
 }
 
 # Kodar om oppfølgingsspørsmål til arbeider_utdannet_til
-# TODO vurder å gjere om til integer med label
 set_grunn_annet_arbeid <- function(sdf, variabel) {
   sdf <- sdf %>% mutate({{variabel}} := case_when(
     {{variabel}} == "Har søkt på jobber som krever masterutdanning, men foreløpig uten hell" |
@@ -1065,6 +1086,12 @@ set_grunn_annet_arbeid <- function(sdf, variabel) {
     {{variabel}} == "Annen grunn" | 
       {{variabel}} == "Annet" ~ "Annen grunn" 
   ))
+  # TODO Det må gå an å gjere dette med variabelnamnet lagra i objekt
+  sdf$grunn_annet_arbeid <- factor(sdf$grunn_annet_arbeid,
+                                               levels = c("Har fått jobb som passer meg like godt", 
+                                                    "Har søkt uten hell", 
+                                                    "Har prøvd, men trivdes ikke", 
+                                                    "Annen grunn"))
   return(sdf)
 }
 
