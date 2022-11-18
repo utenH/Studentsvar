@@ -110,8 +110,11 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
     # Slå saman fordelingstabell og N
     df_ut <- left_join(df_fordeling, df_n, {{grupperingsvariabel}})
     
-    # Legge til kolonne ved å slå saman første kolonne og N-kolonne, fjernar første kolonne
-    df_ut <- df_ut %>% mutate(`Studium / år / N` = paste0(.data[[grupperingsvariabel]], " (", N , ")"))
+    # Legge til kolonne ved å slå saman første kolonne og N-kolonne
+    df_ut <- df_ut %>% mutate(`Studium / år / N` = paste0(.data[[grupperingsvariabel]], 
+                                                          " (", N , ")"))
+    
+    # Fjernar første kolonne og flyttar den nye kolonna først
     df_ut <- df_ut %>% select(-1) %>% relocate(last_col(), 1)
     
     # unngå #NUM! i excel
@@ -157,11 +160,13 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
       T ~ ""
     ))
     
-    # Legge til kolonne ved å slå saman første kolonne og N-kolonne, fjernar første kolonne
+    # Legge til kolonne ved å slå saman første kolonne og N-kolonne
     df_ut <- df_ut %>% mutate(`Studium / N` = 
                                 paste0(.data[[grupperingsvariabel]], 
                                        " (", .data[[nkol_siste]] , "/", .data[[nkol_eldre]], ")",
                                        pstjerne))
+    
+    # Fjernar første kolonne og flyttar den nye kolonna først
     df_ut <- df_ut %>% select(-1) %>% relocate(last_col(), 1)
     
     # unngå #NUM! i excel
@@ -198,8 +203,11 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
       df_ut <- df_ut %>% mutate(across(c(2), round, -3))
     }
     
-    # Legge til kolonne ved å slå saman første kolonne og N-kolonne, fjernar første kolonne
-    df_ut <- df_ut %>% mutate(`Studium / N` = paste0(.data[[grupperingsvariabel]], " (", .data[[nkol_siste]] , ")"))
+    # Legge til kolonne ved å slå saman første kolonne og N-kolonne
+    df_ut <- df_ut %>% mutate(`Studium / N` = paste0(.data[[grupperingsvariabel]], 
+                                                     " (", .data[[nkol_siste]] , ")"))
+    
+    # Fjernar første kolonne og flyttar den nye kolonna først
     df_ut <- df_ut %>% select(-1) %>% relocate(last_col(), 1)
     
     # unngå #NUM! i excel
@@ -321,6 +329,7 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
         # Fakultetsnivå
         writeData(arbeidsbok, sheet = sn, x = df_ut_fakultet, startCol = sc, startRow = sr, colNames = T, keepNA = T)
         sr <- sr + nrow(df_ut_fakultet) + 1
+        
         # OsloMet-nivå
         writeData(arbeidsbok, sheet = sn, x = df_ut_OM, startCol = sc, startRow = sr, colNames = F, keepNA = T)
         
@@ -440,12 +449,11 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
           
           # Skriv ut spørsmålstekst til arket
           # Første halvdel av institutta
-          writeData(arbeidsbok, sheet = sn, x = df_ut, startCol = sc, startRow = sr, keepNA = T)
-          sr <- sr + nrow(df_ut) + 1 
+          writeData(arbeidsbok, sheet = sn, x = df_ut, startCol = sc, startRow = sr, colNames = T, keepNA = T)
+          sr <- sr + nrow(df_ut) + 1
+          # Fakultet 
           writeData(arbeidsbok, sheet = sn, x = df_ut_fakultet, startCol = sc, startRow = sr, colNames = F, keepNA = T)
           sr <- sr + nrow(df_ut_fakultet)
-          # Skriv ikkje ut OsloMet-nivå, berre fakultet
-          # writeData(arbeidsbok, sheet = sn, x = df_ut_OM, startCol = sc, startRow = sr, colNames = F, keepNA = T)
           
           # Andre halvdel av institutta
           if (!is.null(df_ut_2)) {
@@ -454,12 +462,12 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
             df_ut_2 <- df_ut_2 %>% mutate(!!firstColName := gsub("^\\S+\\s", "", .data[[firstColName]]))
             
             sr <- sr + 3
-            writeData(arbeidsbok, sheet = sn, x = df_ut_2, startCol = sc, startRow = sr, keepNA = T)
-            sr <- sr + nrow(df_ut_2) + 1 
+            # Andre halvdel av institutta
+            writeData(arbeidsbok, sheet = sn, x = df_ut_2, startCol = sc, startRow = sr, colNames = T, keepNA = T)
+            sr <- sr + nrow(df_ut_2) + 1
+            # Fakultet
             writeData(arbeidsbok, sheet = sn, x = df_ut_fakultet, startCol = sc, startRow = sr, colNames = F, keepNA = T)
-            sr <- sr + nrow(df_ut_fakultet)
-            # Skriv ikkje ut OsloMet-nivå, berre fakultet
-            # writeData(arbeidsbok, sheet = sn, x = df_ut_OM, startCol = sc, startRow = sr, colNames = F, keepNA = T)
+            sr <- sr + nrow(df_ut_fakultet) + 1
           }
           
           # Formater breidde første kolonne
@@ -491,11 +499,7 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
   
   # Førebu datasett
   # TODO flytt group_by til metodekall for fordeling og snitt?
-  # sdf_studium_ar <- sdf %>% group_by(Studium_ar)
-  # sdf_studium_ar <- sdf %>% group_by(StudiumID_ar)
   sdf_studium_ar <- sdf %>% group_by(Studieprogram_instnr_ar)
-  # sdf_studieprogramnavn <- sdf %>% group_by(Studieprogramnavn)
-  # sdf_studieprogramnavn <- sdf %>% group_by(StudiumID)
   sdf_studieprogramnavn <- sdf %>% group_by(Studieprogram_instnr)
   
   # Skriv ut ei fil per fakultet - kan sikkert endrast til å bestemme grupperinga etter argument

@@ -478,7 +478,7 @@ OM_kandidat_setup_2022 <- function(sdf) {
   
   # Nokre svar kan rekodast basert på fritekstsvar
   sdf <- OM_rekode_2022_studerer_niva(sdf)
-  sdf <- OM_set_faktor_studerer_niva(sdf)
+  sdf <- OM_set_faktor_studerer_niva(sdf, studerer_niva)
   
   sdf <- OM_janei_bin(sdf, flere_arbeidsgivere)
   
@@ -557,7 +557,9 @@ OM_compile_kandidat_data_2022 <- function(path, surveyyear, print = F, filename 
   # TODO pass på programma som ikkje blir fanga opp med rett fakultet (2019)
   
   # Gruppere år i to
-  sdf <- sdf %>% mutate(gruppe_ar = ifelse(undersokelse_ar < 2022, "2018/2019", undersokelse_ar))
+  sdf <- sdf %>% mutate(gruppe_ar = ifelse(undersokelse_ar < 2022, 
+                                           "2018/2019", 
+                                           undersokelse_ar))
   
   # legg til programnamn med instituttilhøyrigheit
   OM_programvar <- read_excel("base/OsloMet_programvariabler.xlsx")
@@ -713,7 +715,13 @@ set_sektor <- function(sdf, variabel) {
   )) 
   # sdf$sektor <- sdf$sektor %>% as.factor
   # Endra for å sette rekkefølgja betre
-  sdf$sektor <- factor(sdf$sektor, levels = c("Kommunal", "Fylkeskommunal", "Statlig", "Privat", "Frivillig"))
+  # sdf$sektor <- factor(sdf$sektor, levels = c("Kommunal", "Fylkeskommunal", "Statlig", "Privat", "Frivillig"))
+  sdf <- sdf %>% mutate({{variabel}} := factor({{variabel}}, 
+                                               levels = c("Kommunal", 
+                                                          "Fylkeskommunal", 
+                                                          "Statlig", "Privat", 
+                                                          "Frivillig"))
+  )
   return(sdf)
 }
 
@@ -1086,12 +1094,12 @@ set_grunn_annet_arbeid <- function(sdf, variabel) {
     {{variabel}} == "Annen grunn" | 
       {{variabel}} == "Annet" ~ "Annen grunn" 
   ))
-  # TODO Det må gå an å gjere dette med variabelnamnet lagra i objekt
-  sdf$grunn_annet_arbeid <- factor(sdf$grunn_annet_arbeid,
+  sdf <- sdf %>% mutate({{variabel}} := factor({{variabel}},
                                                levels = c("Har fått jobb som passer meg like godt", 
                                                     "Har søkt uten hell", 
                                                     "Har prøvd, men trivdes ikke", 
                                                     "Annen grunn"))
+  )
   return(sdf)
 }
 
@@ -1275,9 +1283,12 @@ OM_set_faktor <- function(sdf, svar) {
 }
 
 # Kodar om til faktor
-OM_set_faktor_studerer_niva <- function(sdf) {
+OM_set_faktor_studerer_niva <- function(sdf, variabel) {
   # sdf$studerer_niva <- factor(sdf$studerer_niva, levels = c("Bachelor", "Master", "Ph.d.", "Annet"))
-  sdf$studerer_niva <- factor(sdf$studerer_niva, levels = c("Bachelor", "Master", "Annet"))
+  # sdf$studerer_niva <- factor(sdf$studerer_niva, levels = c("Bachelor", "Master", "Annet"))
+  sdf <- sdf %>% mutate({{variabel}} := factor({{variabel}},
+                                               levels = c("Bachelor", "Master", "Annet"))
+  )
   return(sdf)
 }
 
