@@ -328,14 +328,14 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
         
         # Fakultetsnivå
         # Snur tabellen for å få rett rekkefølgje i graf
-        df_ut_fakultet <- df_ut_fakultet %>% arrange(desc(across(1)))
+        # df_ut_fakultet <- df_ut_fakultet %>% arrange(desc(across(1)))
         
         writeData(arbeidsbok, sheet = sn, x = df_ut_fakultet, startCol = sc, startRow = sr, colNames = T, keepNA = T)
         sr <- sr + nrow(df_ut_fakultet) + 1
         
         # OsloMet-nivå
         # Snur tabellen for å få rett rekkefølgje i graf
-        df_ut_fakultet <- df_ut_fakultet %>% arrange(desc(across(1)))
+        # df_ut_OM <- df_ut_OM %>% arrange(desc(across(1)))
         writeData(arbeidsbok, sheet = sn, x = df_ut_OM, startCol = sc, startRow = sr, colNames = F, keepNA = T)
         
         # Formater breidde første kolonne
