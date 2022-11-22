@@ -327,10 +327,15 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
         }
         
         # Fakultetsnivå
+        # Snur tabellen for å få rett rekkefølgje i graf
+        df_ut_fakultet <- df_ut_fakultet %>% arrange(desc(across(1)))
+        
         writeData(arbeidsbok, sheet = sn, x = df_ut_fakultet, startCol = sc, startRow = sr, colNames = T, keepNA = T)
         sr <- sr + nrow(df_ut_fakultet) + 1
         
         # OsloMet-nivå
+        # Snur tabellen for å få rett rekkefølgje i graf
+        df_ut_fakultet <- df_ut_fakultet %>% arrange(desc(across(1)))
         writeData(arbeidsbok, sheet = sn, x = df_ut_OM, startCol = sc, startRow = sr, colNames = F, keepNA = T)
         
         # Formater breidde første kolonne
@@ -430,11 +435,11 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
           } else if(utskriftsmal[rad, "Svartype"] == "snitt_as_num_single") {
             # df_ut <- print_snitt_as_num(sdf_fakultet_studieprogramnavn, utskriftsmal[rad, "Variabel"], arstal_eldre, arstal_siste)
             df_ut <- print_snitt_as_num_single(sdf_fakultet_studieprogramnavn %>% 
-                                          filter(Institutt == instituttliste[1] | Institutt == instituttliste[2]), 
-                                        utskriftsmal[rad, "Variabel"], arstal_siste)
+                                                 filter(Institutt == instituttliste[1] | Institutt == instituttliste[2]), 
+                                               utskriftsmal[rad, "Variabel"], arstal_siste)
             df_ut_2 <- print_snitt_as_num_single(sdf_fakultet_studieprogramnavn %>% 
-                                            filter(Institutt != instituttliste[1] & Institutt != instituttliste[2]), 
-                                          utskriftsmal[rad, "Variabel"], arstal_siste)
+                                                   filter(Institutt != instituttliste[1] & Institutt != instituttliste[2]), 
+                                                 utskriftsmal[rad, "Variabel"], arstal_siste)
             df_ut_fakultet <- print_snitt_as_num_single(sdf_fakultet %>% group_by(Fakultetsnavn), utskriftsmal[rad, "Variabel"], arstal_siste)
             # df_ut_OM <- print_snitt_as_num(sdf %>% group_by(Institusjon), utskriftsmal[rad, "Variabel"], arstal_eldre, arstal_siste)
           } else if(utskriftsmal[rad, "Svartype"] == "snitt_as_num_serie") {
@@ -442,6 +447,9 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
             df_ut_fakultet <- print_snitt_as_num_serie(sdf_fakultet %>% group_by(Fakultetsnavn), utskriftsmal[rad, "Variabel"], "undersokelse_ar")
             # df_ut_OM <- print_snitt_as_num_serie(sdf %>% group_by(Institusjon), utskriftsmal[rad, "Variabel"], "undersokelse_ar")
           }
+          
+          # Snur tabellen for å få rett rekkefølgje i graf
+          df_ut <- df_ut %>% arrange(desc(across(1)))
           
           # tar bort fakultetnummer og instituttforkorting frå første kolonne
           firstColName <- colnames(df_ut)[1]
@@ -451,21 +459,32 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
           # Første halvdel av institutta
           writeData(arbeidsbok, sheet = sn, x = df_ut, startCol = sc, startRow = sr, colNames = T, keepNA = T)
           sr <- sr + nrow(df_ut) + 1
-          # Fakultet 
+          
+          # Fakultet
+          # Snur tabellen for å få rett rekkefølgje i graf
+          df_ut_fakultet <- df_ut_fakultet %>% arrange(desc(across(1)))
+          
           writeData(arbeidsbok, sheet = sn, x = df_ut_fakultet, startCol = sc, startRow = sr, colNames = F, keepNA = T)
-          sr <- sr + nrow(df_ut_fakultet)
+          sr <- sr + nrow(df_ut_fakultet) + 1
           
           # Andre halvdel av institutta
           if (!is.null(df_ut_2)) {
+            # Snur tabellen for å få rett rekkefølgje i graf
+            df_ut_2 <- df_ut_2 %>% arrange(desc(across(1)))
+            
             # tar bort fakultetnummer og instituttforkorting frå første kolonne
             firstColName <- colnames(df_ut_2)[1]
             df_ut_2 <- df_ut_2 %>% mutate(!!firstColName := gsub("^\\S+\\s", "", .data[[firstColName]]))
             
-            sr <- sr + 3
+            sr <- sr + 2
             # Andre halvdel av institutta
             writeData(arbeidsbok, sheet = sn, x = df_ut_2, startCol = sc, startRow = sr, colNames = T, keepNA = T)
             sr <- sr + nrow(df_ut_2) + 1
+            
             # Fakultet
+            # Snur tabellen for å få rett rekkefølgje i graf
+            df_ut_fakultet <- df_ut_fakultet %>% arrange(desc(across(1)))
+            
             writeData(arbeidsbok, sheet = sn, x = df_ut_fakultet, startCol = sc, startRow = sr, colNames = F, keepNA = T)
             sr <- sr + nrow(df_ut_fakultet) + 1
           }

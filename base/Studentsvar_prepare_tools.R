@@ -218,10 +218,10 @@ dbh_hent_orgdata <- function(instnr) {
   # Forkorte fakultetsnamn
   if (instnr == 1175) {
     dbh_210 <- dbh_210 %>% mutate(Fakultetsnavn = case_when(
-      grepl("HV", Fakultetsnavn) ~ "Fakultet HV",
-      grepl("LUI", Fakultetsnavn) ~ "Fakultet LUI",
-      grepl("SAM", Fakultetsnavn) ~ "Fakultet SAM",
-      grepl("TKD", Fakultetsnavn) ~ "Fakultet TKD"
+      grepl("HV", Fakultetsnavn) ~ "HV",
+      grepl("LUI", Fakultetsnavn) ~ "LUI",
+      grepl("SAM", Fakultetsnavn) ~ "SAM",
+      grepl("TKD", Fakultetsnavn) ~ "TKD"
     ))
   }
   
@@ -458,6 +458,7 @@ OM_kandidat_setup_2022 <- function(sdf) {
   sdf <- OM_rekode_2022_hovedaktivitet(sdf)  
   sdf <- set_a5_hovedaktivitet(sdf)
   sdf <- OM_janei_bin(sdf, arbeider_utdannet_til)
+  
   sdf <- set_grunn_annet_arbeid(sdf, grunn_annet_arbeid)
   
   sdf <- set_forventning(sdf, forventning_arbeidsmarked)
@@ -487,7 +488,9 @@ OM_kandidat_setup_2022 <- function(sdf) {
   sdf <- set_lang_tid_til_relevant_arbeid(sdf, tid_til_relevant_arbeid)
   
   sdf <- set_fornoydmedoppgaver(sdf, fornoyd_oppgaver)
+  sdf$fornoyd_oppgaver[sdf$arbeider_utdannet_til == 0] <- NA
   sdf <- set_forberedtforoppgaver(sdf, forberedt_oppgaver)
+  sdf$forberedt_oppgaver[sdf$arbeider_utdannet_til == 0] <- NA
   
   sdf <- set_kompetanse_tverrprofesjonelt(sdf, kompetanse_tverrprofesjonelt)
   
@@ -557,9 +560,13 @@ OM_compile_kandidat_data_2022 <- function(path, surveyyear, print = F, filename 
   # TODO pass på programma som ikkje blir fanga opp med rett fakultet (2019)
   
   # Gruppere år i to
-  sdf <- sdf %>% mutate(gruppe_ar = ifelse(undersokelse_ar < 2022, 
-                                           "2018/2019", 
+  sdf <- sdf %>% mutate(gruppe_ar = ifelse(undersokelse_ar < 2022,
+                                           "2018/2019",
                                            undersokelse_ar))
+  # Legg til bokstavkode for å sortere årstala baklengs
+  # sdf <- sdf %>% mutate(gruppe_ar = ifelse(undersokelse_ar < 2022, 
+  #                                          paste0("bbbb", "2018/2019"), 
+  #                                          paste0("aaaa", undersokelse_ar)))
   
   # legg til programnamn med instituttilhøyrigheit
   OM_programvar <- read_excel("base/OsloMet_programvariabler.xlsx")
@@ -753,6 +760,15 @@ set_fylke <- function(sdf, variabel) {
       {{variabel}} == "Viken" ~ 1,
     {{variabel}} != "" ~ 0
   ))
+  
+  sdf <- sdf %>% mutate(oslo_viken_annet = case_when(
+    {{variabel}} == "Oslo" ~ "Oslo",
+      {{variabel}} == "Viken" ~ "Viken",
+    {{variabel}} != "" ~ "Annet"
+  ),
+  oslo_viken_annet = factor(oslo_viken_annet, levels=c("Oslo", "Viken","Annet"))
+  )
+  
   return(sdf)
 }
 
