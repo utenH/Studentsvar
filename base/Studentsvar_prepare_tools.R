@@ -287,7 +287,19 @@ dbh_add_progresjon <- function(sdf, tidsvar) {
 }
 
 dbh_hent_studieplassdata <- function(institusjonsnummer) {
-  sdf <- dbh_data(370, filters = c("institusjonskode"=institusjonsnummer))
+  sdf <- dbh_data(370, filters = list("institusjonskode" = institusjonsnummer,
+                                      "Årstall" = "*"), 
+                  group_by = list("Avdelingskode", "Institusjonskode", "Årstall"))
+  return(sdf)
+}
+
+dbh_hent_soknadsdata <- function(institusjonsnummer) {
+  sdf <- dbh_data(379, filters = c("institusjonskode"=institusjonsnummer))
+  return(sdf)
+}
+
+dbh_hent_gjennomforingsdata <- function(institusjonsnummer) {
+  sdf <- dbh_data(707, filters = c("institusjonskode"=institusjonsnummer))
   return(sdf)
 }
 
@@ -487,10 +499,12 @@ OM_kandidat_setup_2022 <- function(sdf) {
   sdf <- set_jobbunderveis(sdf, tid_til_relevant_arbeid)
   sdf <- set_lang_tid_til_relevant_arbeid(sdf, tid_til_relevant_arbeid)
   
+  sdf$fornoyd_pre <- sdf$fornoyd_oppgaver
   sdf <- set_fornoydmedoppgaver(sdf, fornoyd_oppgaver)
-  sdf$fornoyd_oppgaver[sdf$arbeider_utdannet_til == 0] <- NA
+  sdf$fornoyd_oppgaver[sdf$arbeider_utdannet_til == 0 | is.nan(sdf$arbeider_utdannet_til)] <- NA
+  sdf$forberedt_pre <- sdf$forberedt_oppgaver  
   sdf <- set_forberedtforoppgaver(sdf, forberedt_oppgaver)
-  sdf$forberedt_oppgaver[sdf$arbeider_utdannet_til == 0] <- NA
+  sdf$forberedt_oppgaver[sdf$arbeider_utdannet_til == 0 | is.nan(sdf$arbeider_utdannet_til)] <- NA
   
   sdf <- set_kompetanse_tverrprofesjonelt(sdf, kompetanse_tverrprofesjonelt)
   
@@ -516,15 +530,17 @@ OM_kandidat_setup_2022 <- function(sdf) {
   sdf <- set_dinalder(sdf)
   
   sdf <- sdf %>% mutate(brutto_arslonn_vasket = brutto_arslonn)
-  sdf$brutto_arslonn_vasket[sdf$arbeider_utdannet_til != 1] <- NA 
-  sdf$brutto_arslonn_vasket[is.na(sdf$arbeider_utdannet_til)] <- NA
-  sdf$brutto_arslonn_vasket[is.na(sdf$stillingsandel) & sdf$brutto_arslonn < 300000] <- NA 
-  sdf$brutto_arslonn_vasket[sdf$stillingsandel > 0.8 & sdf$brutto_arslonn < 300000] <- NA 
-  sdf$brutto_arslonn_vasket[sdf$stillingsandel == 0.8 & sdf$brutto_arslonn < 240000] <- NA 
-  sdf$brutto_arslonn_vasket[sdf$stillingsandel == 0.6 & sdf$brutto_arslonn < 180000] <- NA 
-  sdf$brutto_arslonn_vasket[sdf$stillingsandel == 0.5 & sdf$brutto_arslonn < 150000] <- NA 
-  sdf$brutto_arslonn_vasket[sdf$stillingsandel == 0.4 & sdf$brutto_arslonn < 120000] <- NA 
+  sdf$brutto_arslonn_vasket[sdf$brutto_arslonn < 300000] <- NA 
   sdf$brutto_arslonn_vasket[sdf$brutto_arslonn > 1000000] <- NA 
+  sdf$brutto_arslonn_vasket[sdf$stillingsandel < 1] <- NA
+  # sdf$brutto_arslonn_vasket[is.na(sdf$stillingsandel) & sdf$brutto_arslonn < 300000] <- NA 
+  # sdf$brutto_arslonn_vasket[is.na(sdf$arbeider_utdannet_til)] <- NA
+  # sdf$brutto_arslonn_vasket[sdf$arbeider_utdannet_til != 1] <- NA 
+  # sdf$brutto_arslonn_vasket[sdf$stillingsandel > 0.8 & sdf$brutto_arslonn < 300000] <- NA 
+  # sdf$brutto_arslonn_vasket[sdf$stillingsandel == 0.8 & sdf$brutto_arslonn < 240000] <- NA 
+  # sdf$brutto_arslonn_vasket[sdf$stillingsandel == 0.6 & sdf$brutto_arslonn < 180000] <- NA 
+  # sdf$brutto_arslonn_vasket[sdf$stillingsandel == 0.5 & sdf$brutto_arslonn < 150000] <- NA 
+  # sdf$brutto_arslonn_vasket[sdf$stillingsandel == 0.4 & sdf$brutto_arslonn < 120000] <- NA 
   
   return(sdf)
 }
@@ -763,6 +779,9 @@ set_fylke <- function(sdf, variabel) {
   
   sdf <- sdf %>% mutate(oslo_viken_annet = case_when(
     {{variabel}} == "Oslo" ~ "Oslo",
+      {{variabel}} == "Akershus" |
+      {{variabel}} == "Buskerud" |
+      {{variabel}} == "Østfold" |
       {{variabel}} == "Viken" ~ "Viken",
     {{variabel}} != "" ~ "Annet"
   ),
@@ -805,7 +824,7 @@ set_fylke <- function(sdf, variabel) {
 # }
 
 # Lagar variabel for hovedaktivitet, variant
-# TODO vurder å gjere om til integer med label
+# TODO gjere om til integer med label
 set_a5_hovedaktivitet <- function(sdf) {
   sdf <- sdf %>% mutate(a5_hovedaktivitet = case_when(
     hovedaktivitet == "Ansatt i fast stilling (inkl. prøvetid)" | hovedaktivitet == "Ansatt i fast stilling" ~ "1-Fast stilling",
@@ -1350,6 +1369,23 @@ OM_janei_bin_nyvar <- function(sdf, nyvar, svar) {
     grepl("Usikker", {{svar}}) ~ NaN,
     grepl("Uncertain", {{svar}}) ~ NaN
   ))
+}
+
+OM_text_to_factor <- function(sdf, innvariabel, utvariabel, nivå = NULL) {
+  sdf <- sdf %>% mutate({{utvariabel}} := case_when(
+    grepl("1", {{innvariabel}}) ~ 1,
+    grepl("2", {{innvariabel}}) ~ 2,
+    grepl("3", {{innvariabel}}) ~ 3,
+    grepl("4", {{innvariabel}}) ~ 4,
+    grepl("5", {{innvariabel}}) ~ 5,
+    {{innvariabel}} != "" ~ NaN
+  ))
+  if (is.vector(nivå)) {
+    sdf <- sdf %>% mutate({{utvariabel}} := factor({{utvariabel}},
+                                                   levels = c(1, 2, 3, 4, 5),
+                                                 labels = nivå))
+  }
+  return(sdf)
 }
 
 # Kodar om frå tekst-"ordinal" til tal-nivå

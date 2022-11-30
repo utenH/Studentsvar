@@ -173,7 +173,7 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
     df_ut[df_ut == "NaN"] <- NA
     
     # #* fjerne data med lav N
-    # # fjernar resultat der det er færre enn fire minimumsgrensa har svart
+    # # fjernar resultat der det er færre enn minimumsgrensa har svart
     # kolonner <- ncol(df_ut) - 5
     for (x in 2:3) {
       df_ut[x][df_ut[x + 2] < min_svar] <- NA
