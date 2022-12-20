@@ -423,9 +423,12 @@ SB_prep_indeks <- function(sdf) {
   sdf$mis_medv3 <- SB_add_countmiss(sdf, var_medv)
   sdf$indx_medv3[which(sdf$mis_medv3 > 0)] <- NA  
   
+  # Endra i 2022
+  try(expr = {
   sdf$indx_insp3 <- SB_add_indx_m(sdf, var_insp)
   sdf$mis_insp3 <- SB_add_countmiss(sdf, var_insp)
   sdf$indx_insp3[which(sdf$mis_insp3 > 0)] <- NA  
+  }, silent = TRUE)
   
   # Endra i 2020
   try(expr = {
@@ -444,13 +447,19 @@ SB_prep_indeks <- function(sdf) {
   sdf$mis_eget4 <- SB_add_countmiss(sdf, var_egeteng)
   sdf$indx_eget4[which(sdf$mis_eget4 > 1)] <- NA
   
+  # Endra i 2022
+  try(expr = {
   sdf$indx_forvent4 <- SB_add_indx_m(sdf, var_forvent)
   sdf$mis_forvent4 <- SB_add_countmiss(sdf, var_forvent)
   sdf$indx_forvent4[which(sdf$mis_forvent4 > 1)] <- NA
+  }, silent = TRUE)
   
+  # Endra i 2022
+  try(expr = {
   sdf$indx_digit4 <- SB_add_indx_m(sdf, var_digitale)
   sdf$mis_digit4 <- SB_add_countmiss(sdf, var_digitale)
   sdf$indx_digit4[which(sdf$mis_digit4 > 1)] <- NA
+  }, silent = TRUE)
   
   return(sdf)
 }

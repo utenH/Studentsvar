@@ -184,14 +184,13 @@ server <- function(input, output) {
     
   })
   
-  # Bedre om denne blir kalla på av downloadhelper nedanfor?
-  # observeEvent(input$start, {
+  # Lagar arbeidsbokobjekt
   workbook <- reactive({
     if (is.null(input$nyastedata)) return()
     if (!is.null(input$malfil)) {
       templatepath <- input$malfil$datapath
     } else {
-      templatepath <- "base/Studiebarometeret_2022_vars.xlsx"
+      templatepath <- "malfiler/Studiebarometeret_2023_vars.xlsx"
     }
     surveyname <- input$surveyname
     levelfilter <- input$levelfilter
@@ -204,12 +203,12 @@ server <- function(input, output) {
     # TODO: legg inn case for å sjekke om ein skal bruke SA_prepare, SB_prepare eller OM_prepare
     df <- SB_prepare_2022(input$nyastedata$datapath, input$nyastear, input$instnr)
     print("Eventuelle programkoder utan Fakultetstilknytning: ") 
-    print(df %>% filter(is.na(Fakultetsnavn)) %>% select(Studieprogramkode) %>% 
+    print(df %>% filter(is.na(FAKNAVN)) %>% select(Studieprogramkode) %>% 
             unique)
     df_previous <- SB_prepare_2022(input$forrigedata$datapath, input$forrigear, input$instnr)
     
-    workbook <- OM_print_2022(survey = surveyname, source_df = df, source_df_forrige = df_previous,
-                              malfil = templatepath, nivå = levelfilter)#, part = " rshiny")
+    workbook <- OM_print_2023(survey = surveyname, source_df = df, source_df_forrige = df_previous,
+                              malfil = templatepath, nivå = levelfilter)
     # print(typeof(workbook))
     return(workbook)
   })

@@ -705,6 +705,7 @@ OM_print_2022 <- function(survey, source_df, source_df_forrige, malfil = "", niv
     
     # https://www.rdocumentation.org/packages/openxlsx/versions/4.2.3/topics/conditionalFormatting
     # Conditional formatting
+    # Bruk bgFill i conditional
     # diff_celle <- firstDataRow + (NROW(tmp_utd_df) + 7) * 2
     diff_celle <- firstDataRow + (prog_n + 7) * 2
     # p_celle <- firstDataRow + (NROW(tmp_utd_df) + 7) * 3
@@ -722,7 +723,7 @@ OM_print_2022 <- function(survey, source_df, source_df_forrige, malfil = "", niv
                           cols = firstDataCol:sc,
                           rows = firstDataRow:sr,
                           rule = diff_neg,
-                          style = SB_style_lred
+                          style = SB_style_dred_border
     )
     
     # Regel for positiv
@@ -732,7 +733,7 @@ OM_print_2022 <- function(survey, source_df, source_df_forrige, malfil = "", niv
                           cols = firstDataCol:sc,
                           rows = firstDataRow:sr,
                           rule = diff_pos,
-                          style = SB_style_lgreen
+                          style = SB_style_dgreen_border
     )
     
     # Regel for ikkje-signifikant
@@ -742,6 +743,26 @@ OM_print_2022 <- function(survey, source_df, source_df_forrige, malfil = "", niv
                           rows = firstDataRow:sr,
                           rule = non_sig,
                           style = SB_style_default
+    )
+    
+    # Regel for gode resultat på 1-5 likert
+    godt_resultat <- c(4, 5)
+    conditionalFormatting(ab, sn,
+                          cols = firstDataCol:siste_likert_kol,
+                          rows = firstDataRow:sr,
+                          type = "between",
+                          rule = godt_resultat,
+                          style = SB_style_lgreen_fill
+    )
+    
+    # Regel for gode resultat på 1-5 likert
+    svakt_resultat <- c(1, 3.59)
+    conditionalFormatting(ab, sn,
+                          cols = firstDataCol:siste_likert_kol,
+                          rows = firstDataRow:sr,
+                          type = "between",
+                          rule = svakt_resultat,
+                          style = SB_style_lred_fill
     )
     
     # Lesbarheit
@@ -803,6 +824,281 @@ OM_print_2022 <- function(survey, source_df, source_df_forrige, malfil = "", niv
   
   return(ab)
 } # END OM_print_2022
+
+# Lagar arbeidsbokobjekt, med faner per fakultet, samanliknar snitt med året før
+OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", nivå = "Alle") {
+  
+  # Set kva år som skal samanliknast - blir også brukt til å lage samanslått df for t.test
+  sisteår <- source_df$undersøkelse_år %>% unique
+  forrigeår <- source_df_forrige$undersøkelse_år %>% unique
+  print(paste("Samanliknar", sisteår, "med", forrigeår))
+  
+  ##* Filtrering:
+  #* ta bort dei utan fakultet
+  #* ta bort program som ikkje er i source_df frå source_df_forrige
+  # Tar bort tredjeåret, for å ha likt samanlikningsgrunnlag
+  source_df <- source_df %>% filter(!is.na(FAKNAVN), STUDIEAR != 3)
+  source_df_forrige <- source_df_forrige %>% filter(!is.na(FAKNAVN), STUDIEAR != 3)
+  
+  # Kan brukast for å samanlikne andreåret mot dei på tredjeåret
+  # source_df <- source_df %>% filter(!is.na(FAKNAVN), STUDIEAR != 3)
+  # source_df_forrige <- source_df_forrige %>% filter(!is.na(FAKNAVN), STUDIEAR == 3)
+  
+  print(source_df %>% NROW)  
+  ##** Skiljer mellom Master og Bachelor
+  ##* Endringar i 2022-kode: Sørga for å kode Bachelor/Master i dataframes, sparer kompleksitet her
+  ##* Bruke StudiumID - kombinasjon av dbh-registrerte variablar
+  ##* nivå kan vere Bachelor, Master eller Annet
+  print(source_df %>% select(Nivå) %>% unique())
+  if (nivå != "Alle") {
+    source_df <- source_df %>% filter(Nivå == nivå)
+    source_df_forrige <- source_df_forrige %>% filter(Nivå == nivå)
+  }
+  
+  # Print
+  # lag ny arbeidsbok sn == arknummer
+  sn <- 1
+  ab <- createWorkbook()
+  
+  ##** Hent mal frå xlsx
+  utskriftsmal <- read.xlsx(malfil)
+  
+  for (fak in source_df$FAKNAVN %>% unique %>% sort) {
+    # TODO ta bort gruppering her og seinare i koden, det er ikkje gjort likt på årets og forrige?
+    # å gruppere noko som alt er gruppert, vil først fjerne gammal gruppering, så har ikkje noko å seie
+    # 2022: bytta ut Studieprogram_instkode med StudiumID (Kode + namn), gjort for å skilje mellom deltid/heiltid, t.d.
+    
+    # handterer manglande data, for å ha jamt tal på linjer
+    utd_df <- source_df %>% filter(FAKNAVN == fak) %>% group_by(StudiumID, .drop=FALSE) 
+    
+    # Sikrar like mange linjer med data
+    prog_n <- utd_df %>% select(StudiumID) %>% unique %>% NROW
+    fak_df <- source_df %>% filter(FAKNAVN == fak) %>% group_by(FAKNAVN)
+    
+    # Kunne gjort dette utanfor loop, men då må det lagrast til ny variabel 
+    source_df <- source_df %>% group_by(instnr)
+    
+    # Slår saman datasetta til bruk i samanlikning
+    df_bound <- bind_rows(source_df, source_df_forrige)
+    
+    # Filtrerer bort program som ikkje finst i nyaste datasett
+    utd_df_forrige <- source_df_forrige %>% 
+      filter(FAKNAVN == fak, StudiumID %in% source_df$StudiumID) %>% 
+      group_by(StudiumID, .drop=FALSE)
+    
+    # Slår saman datasetta til bruk i samanlikning
+    df_utd_bound <- bind_rows(utd_df, utd_df_forrige)   
+    
+    fak_df_forrige <- source_df_forrige %>% filter(FAKNAVN == fak) %>% group_by(FAKNAVN)
+    source_df_forrige <- source_df_forrige %>% group_by(instnr)
+    
+    # Slår saman datasetta til bruk i samanlikning
+    # TODO Kan kanskje bruke berre samanslått sett, og bruke undersøkelse_år for å skilje?
+    df_fak_bound <- bind_rows(fak_df, fak_df_forrige)  
+    
+    # sr == radnummer
+    sr <- 3
+    # sc == kolonnenummer
+    sc <- 1
+    # siste_likert_kol - siste kolonne å farge basert på femdelt skala
+    siste_likert_kol <- 2
+    
+    # Arknamn + tittel
+    print(fak_df[1,]$FAKNAVN)
+    
+    addWorksheet(ab, sheetName = strtrim(fak_df[1,]$FAKNAVN, 30))
+    writeData(ab, sheet = sn, x = utskriftsmal[1, "Blokkoverskrift"], startCol = sc, startRow = 1, colNames = FALSE)
+    writeData(ab, sheet = sn, x = paste(nivå, fak, sep = " - "), startCol = sc, startRow = 2, colNames = FALSE)
+    
+    # Første rad - program/fakultet/OM for alle blokkene
+    uthevkol <- c(sc)
+    skillekol <- c()
+    SB_print_fc(utd_df, fak_df, source_df, sn, sc, sr, ab)
+    sc <- sc + 1
+    
+    ##** Skriv ut basert på xlsx-mal
+    # Finn lengde på mal
+    malrader <- NROW(utskriftsmal)
+    # loop gjennom rad for rad
+    for (rad in seq(from = 2, nrow((utskriftsmal)))) {
+      if (!is.na(utskriftsmal[rad, "Blokkoverskrift"])) {
+        # om det er overskriftsrad, legg til skillekolonne
+        skillekol <- append(skillekol, sc)
+        sc <- sc + 1
+        SB_print_batteryheader(utskriftsmal[rad, "Blokkoverskrift"], utskriftsmal[rad, "Ingress"], ab, sn, sc)
+      } else if (!is.na(utskriftsmal[rad, "Spørsmålstekst"])) {
+        # om det er spørsmålsrad
+        # SB_sub_print(utd_df, fak_df, source_df, source_df_forrige, ab, sn, sc, sr, prog_n, 
+        SB_sub_print(utd_df, fak_df, source_df, utd_df_forrige, fak_df_forrige, source_df_forrige, ab, sn, sc, sr, prog_n, 
+                     utskriftsmal[rad, "Spørsmålstekst"], utskriftsmal[rad, "Variabel"], utskriftsmal[rad, "Tid"])
+        
+        # Set siste kolonne som kan formaterast etter femdelt skala
+        if (siste_likert_kol < 3 & utskriftsmal[rad, "Tid"]) {
+          siste_likert_kol <- sc
+        }
+        sc <- sc + 1
+      }
+      
+      # Til bruk i formatering - om det er snitt eller prosent, f.eks.
+      if (F) {
+      }
+    } # END loop gjennom malark
+    
+    qtextRow <- 3
+    firstDataRow <- 4
+    firstDataCol <- 2
+    lastDataCol <- sc - 1
+    qRowHeight <- 90
+    
+    # sr <- NROW(tmp_utd_df) + 7
+    sr <- prog_n + 7
+    # Farge øvst
+    addStyle(ab, sn, SB_style_yellow, rows = 1:qtextRow, cols = 1:lastDataCol, gridExpand = T)
+    # addStyle(ab, sn, SB_style_wrap, rows = 2:qtextRow, cols = 1:lastDataCol, gridExpand = T, stack = T)
+    addStyle(ab, sn, SB_style_header, rows = 1:2, cols = 1, gridExpand = T, stack = T)
+    addStyle(ab, sn, SB_style_bold, rows = 1:2, cols = 1:lastDataCol, gridExpand = T, stack = T)
+    addStyle(ab, sn, SB_style_normal, rows = 3, cols = 1, gridExpand = T, stack = T)
+    
+    addStyle(ab, sn, SB_style_bold, rows = qtextRow, cols = 2, gridExpand = T, stack = T)
+    addStyle(ab, sn, SB_style_spm, rows = qtextRow, cols = 1:lastDataCol, gridExpand = T, stack = T)
+    
+    # Bakgrunnsfarge
+    addStyle(ab, sn, SB_style_lgrey, rows = firstDataRow:sr, cols = 1:lastDataCol, gridExpand = T, stack = T)
+    addStyle(ab, sn, SB_style_num, rows = firstDataRow:sr, cols = firstDataCol:lastDataCol, gridExpand = T, stack = T)
+    
+    # Farge på utheva kolonner 
+    for (x in uthevkol) {
+      addStyle(ab, sn, SB_style_yellow, rows = firstDataRow:sr, cols = x, gridExpand = T)
+      addStyle(ab, sn, SB_style_num, rows = firstDataRow:sr, cols = firstDataCol:lastDataCol, gridExpand = T, stack = T)
+      addStyle(ab, sn, SB_style_bold, rows = qtextRow:sr, cols = x, gridExpand = T, stack = T)
+      addStyle(ab, sn, SB_style_batteryborder, rows = 1:qtextRow, cols = x, gridExpand = T, stack = T)
+    }
+    
+    # Farge på skillekolonner 
+    for (x in skillekol) {
+      addStyle(ab, sn, SB_style_lgrey, rows = 1:sr, cols = x, gridExpand = T)
+    }
+    
+    # https://www.rdocumentation.org/packages/openxlsx/versions/4.2.3/topics/conditionalFormatting
+    # Conditional formatting
+    # diff_celle <- firstDataRow + (NROW(tmp_utd_df) + 7) * 2
+    diff_celle <- firstDataRow + (prog_n + 7) * 2
+    # p_celle <- firstDataRow + (NROW(tmp_utd_df) + 7) * 3
+    p_celle <- firstDataRow + (prog_n + 7) * 3
+    print(paste("d", diff_celle, "p", p_celle))
+    
+    ndif <- paste("B", diff_celle, "<0", sep = "")
+    pdif <- paste("B", diff_celle, "<0", sep = "")
+    pdif <- paste("B", p_celle, ">=0.05", sep = "")
+    
+    # Regel for negativ
+    diff_neg <- paste("B", diff_celle, "<0", sep = "")
+    # diff_neg <- paste("AND(", ndif, ";", pdif, ")", sep = "")
+    conditionalFormatting(ab, sn,
+                          cols = firstDataCol:sc,
+                          rows = firstDataRow:sr,
+                          rule = diff_neg,
+                          style = SB_style_dred_border
+    )
+    
+    # Regel for positiv
+    diff_pos <- paste("B", diff_celle, ">0", sep = "")
+    # diff_pos <- paste("AND(", pdif, ";", pdif, ")", sep = "")
+    conditionalFormatting(ab, sn,
+                          cols = firstDataCol:sc,
+                          rows = firstDataRow:sr,
+                          rule = diff_pos,
+                          style = SB_style_dgreen_border
+    )
+    
+    # Regel for ikkje-signifikant
+    non_sig <- paste("B", p_celle, ">=0.05", sep = "")
+    conditionalFormatting(ab, sn,
+                          cols = firstDataCol:sc,
+                          rows = firstDataRow:sr,
+                          rule = non_sig,
+                          style = SB_style_default
+    )
+    
+    # Regel for gode resultat på 1-5 likert
+    godt_resultat <- c(4, 5)
+    conditionalFormatting(ab, sn,
+                          cols = firstDataCol:siste_likert_kol,
+                          rows = firstDataRow:sr,
+                          type = "between",
+                          rule = godt_resultat,
+                          style = SB_style_lgreen_fill
+    )
+    
+    # Regel for gode resultat på 1-5 likert
+    svakt_resultat <- c(1, 3.59)
+    conditionalFormatting(ab, sn,
+                          cols = firstDataCol:siste_likert_kol,
+                          rows = firstDataRow:sr,
+                          type = "between",
+                          rule = svakt_resultat,
+                          style = SB_style_lred_fill
+    )
+    
+    # Lesbarheit
+    setRowHeights(
+      ab,
+      sn,
+      rows = qtextRow,
+      heights = qRowHeight
+    )
+    
+    # Første
+    setColWidths(
+      ab,
+      sn,
+      cols = 1,
+      widths = 60
+    )
+    
+    setColWidths(
+      ab,
+      sn,
+      cols = firstDataCol:sc,
+      widths = 17
+    )
+    
+    # Skillekolonner
+    setColWidths(
+      ab,
+      sn,
+      cols = skillekol,
+      widths = 2
+    )
+    
+    freezePane(
+      ab,
+      sn,
+      firstActiveRow = firstDataRow,
+      firstActiveCol = 2
+    )
+    
+    # formatering av ekstra blokker
+    # blokkoverskrifter
+    # N
+    overskriftsrad <- firstDataRow + (prog_n + 5)
+    addStyle(ab, sn, SB_style_bold, rows = overskriftsrad, cols = 1, gridExpand = T, stack = T)
+    
+    # diff
+    overskriftsrad <- overskriftsrad + (prog_n + 7)
+    diffblokkLast <- overskriftsrad + (prog_n + 5)
+    addStyle(ab, sn, SB_style_bold, rows = overskriftsrad, cols = 1, gridExpand = T, stack = T)
+    addStyle(ab, sn, SB_style_differanseblokk, rows = overskriftsrad:diffblokkLast, cols = 1:sc, gridExpand = T, stack = T)
+    
+    # p-verdi
+    overskriftsrad <- overskriftsrad + (prog_n + 7)
+    addStyle(ab, sn, SB_style_bold, rows = overskriftsrad, cols = 1, gridExpand = T, stack = T)
+    
+    sn <- sn + 1
+  } #END sheet loop
+  
+  return(ab)
+} # END OM_print_2023
 
 # Fritekst
 # deler fritekstdata i filer gruppert på institutt
@@ -989,11 +1285,11 @@ SB_style_spm <- createStyle(
 )
 
 SB_style_lgrey <- createStyle(
-  fgFill = "#DCDCDC" #,
+  fgFill = "#DCDCDC"
 )
 
 SB_style_skille <- createStyle(
-  fgFill = "#EBEBEB" #,
+  fgFill = "#EBEBEB"
 )
 
 SB_style_num <- createStyle(
@@ -1004,23 +1300,31 @@ SB_style_orange <- createStyle(
   fgFill = "#ffa64d"
 )
 
-SB_style_lred <- createStyle(
+SB_style_dred_border <- createStyle(
   border = "TopBottomLeftRight",
   borderStyle = "medium",
-  borderColour = "#ff8080"
+  borderColour = "#C00000"
 )
 
-SB_style_lgreen <- createStyle(
+SB_style_lred_fill <- createStyle(
+  bgFill = "#FFD1D1"
+)
+
+SB_style_dgreen_border <- createStyle(
   border = "TopBottomLeftRight",
   borderStyle = "medium",
-  borderColour = "#80ffaa"
+  borderColour = "#76933C"
+)
+
+SB_style_lgreen_fill <- createStyle(
+  bgFill = "#D8E4BC"
 )
 
 SB_style_differanseblokk <- createStyle(
   fgFill = "#E7F6FF",
   border = "TopBottomLeftRight",
   borderColour = "#DCDCDC",
-  borderStyle = "thin",
+  borderStyle = "thin"
 )
 
 ##** Hjelpefunksjonar for utskrift
@@ -1097,7 +1401,7 @@ SB_sub_print <- function(utd_df, fak_df, source_df, utd_df_forrige, fak_df_forri
   tmp_utd_df_prev <- utd_df_forrige
   tmp_fak_df_prev <- fak_df_forrige
   tmp_OM_df_prev <- source_df_forrige
-  # TODO - gjer dette til ein sjekk mot utskriftsmal
+  # Dersom det er tidsvariablar, må det handterast spesielt
   if (tid) {
     tmp_utd_df <- tmp_utd_df %>% filter(!is.na(tid_brutto))
     tmp_fak_df <- tmp_fak_df %>% filter(Progresjon == "100 %", !is.na(tid_brutto))
@@ -1138,6 +1442,7 @@ SB_sub_print <- function(utd_df, fak_df, source_df, utd_df_forrige, fak_df_forri
   writeData(ab, sn, tmp_OM_df_resultat["p"], sc, sr + 4 + prog_n, colNames = FALSE)  
   
   # set utskriftsradnummer tilbake til utgangspunkt, går ei kolonne til høgre
+  # TODO sjekk om desse to eigentleg påverkar noko etter at eg bytta frå macro til funksjon
   sr <- srbup
   sc <- sc + 1
 }
