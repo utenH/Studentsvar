@@ -677,7 +677,7 @@ OM_print_2022 <- function(survey, source_df, source_df_forrige, malfil = "", niv
     # sr <- NROW(tmp_utd_df) + 7
     sr <- prog_n + 7
     # Farge øvst
-    addStyle(ab, sn, SB_style_yellow, rows = 1:qtextRow, cols = 1:lastDataCol, gridExpand = T)
+    addStyle(ab, sn, SB_style_headerbg, rows = 1:qtextRow, cols = 1:lastDataCol, gridExpand = T)
     # addStyle(ab, sn, SB_style_wrap, rows = 2:qtextRow, cols = 1:lastDataCol, gridExpand = T, stack = T)
     addStyle(ab, sn, SB_style_header, rows = 1:2, cols = 1, gridExpand = T, stack = T)
     addStyle(ab, sn, SB_style_bold, rows = 1:2, cols = 1:lastDataCol, gridExpand = T, stack = T)
@@ -692,7 +692,7 @@ OM_print_2022 <- function(survey, source_df, source_df_forrige, malfil = "", niv
     
     # Farge på utheva kolonner 
     for (x in uthevkol) {
-      addStyle(ab, sn, SB_style_yellow, rows = firstDataRow:sr, cols = x, gridExpand = T)
+      addStyle(ab, sn, SB_style_headerbg, rows = firstDataRow:sr, cols = x, gridExpand = T)
       addStyle(ab, sn, SB_style_num, rows = firstDataRow:sr, cols = firstDataCol:lastDataCol, gridExpand = T, stack = T)
       addStyle(ab, sn, SB_style_bold, rows = qtextRow:sr, cols = x, gridExpand = T, stack = T)
       addStyle(ab, sn, SB_style_batteryborder, rows = 1:qtextRow, cols = x, gridExpand = T, stack = T)
@@ -723,7 +723,7 @@ OM_print_2022 <- function(survey, source_df, source_df_forrige, malfil = "", niv
                           cols = firstDataCol:sc,
                           rows = firstDataRow:sr,
                           rule = diff_neg,
-                          style = SB_style_dred_border
+                          style = SB_style_sig_neg_ramme
     )
     
     # Regel for positiv
@@ -733,7 +733,7 @@ OM_print_2022 <- function(survey, source_df, source_df_forrige, malfil = "", niv
                           cols = firstDataCol:sc,
                           rows = firstDataRow:sr,
                           rule = diff_pos,
-                          style = SB_style_dgreen_border
+                          style = SB_style_sig_pos_ramme
     )
     
     # Regel for ikkje-signifikant
@@ -752,7 +752,7 @@ OM_print_2022 <- function(survey, source_df, source_df_forrige, malfil = "", niv
                           rows = firstDataRow:sr,
                           type = "between",
                           rule = godt_resultat,
-                          style = SB_style_lgreen_fill
+                          style = SB_style_pos_res_fyll
     )
     
     # Regel for gode resultat på 1-5 likert
@@ -762,7 +762,7 @@ OM_print_2022 <- function(survey, source_df, source_df_forrige, malfil = "", niv
                           rows = firstDataRow:sr,
                           type = "between",
                           rule = svakt_resultat,
-                          style = SB_style_lred_fill
+                          style = SB_style_svakt_res_fyll
     )
     
     # Lesbarheit
@@ -826,8 +826,12 @@ OM_print_2022 <- function(survey, source_df, source_df_forrige, malfil = "", niv
 } # END OM_print_2022
 
 # Lagar arbeidsbokobjekt, med faner per fakultet, samanliknar snitt med året før
+
+# TODO legg inn noko slikt:
+# tar bort fakultetnummer og instituttforkorting frå første kolonne
+# firstColName <- colnames(df_ut)[1]
+# df_ut <- df_ut %>% mutate(!!firstColName := gsub("^\\S+\\s", "", .data[[firstColName]]))
 OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", nivå = "Alle") {
-  
   # Set kva år som skal samanliknast - blir også brukt til å lage samanslått df for t.test
   sisteår <- source_df$undersøkelse_år %>% unique
   forrigeår <- source_df_forrige$undersøkelse_år %>% unique
@@ -837,8 +841,8 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
   #* ta bort dei utan fakultet
   #* ta bort program som ikkje er i source_df frå source_df_forrige
   # Tar bort tredjeåret, for å ha likt samanlikningsgrunnlag
-  source_df <- source_df %>% filter(!is.na(FAKNAVN), STUDIEAR != 3)
-  source_df_forrige <- source_df_forrige %>% filter(!is.na(FAKNAVN), STUDIEAR != 3)
+  source_df <- source_df %>% filter(!is.na(FAKNAVN), STUDIEAR != 3 | is.na(STUDIEAR))
+  source_df_forrige <- source_df_forrige %>% filter(!is.na(FAKNAVN), STUDIEAR != 3 | is.na(STUDIEAR))
   
   # Kan brukast for å samanlikne andreåret mot dei på tredjeåret
   # source_df <- source_df %>% filter(!is.na(FAKNAVN), STUDIEAR != 3)
@@ -847,7 +851,7 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
   print(source_df %>% NROW)  
   ##** Skiljer mellom Master og Bachelor
   ##* Endringar i 2022-kode: Sørga for å kode Bachelor/Master i dataframes, sparer kompleksitet her
-  ##* Bruke StudiumID - kombinasjon av dbh-registrerte variablar
+  ##* 2023: tilbake til Studieprogram_instnr
   ##* nivå kan vere Bachelor, Master eller Annet
   print(source_df %>% select(Nivå) %>% unique())
   if (nivå != "Alle") {
@@ -866,13 +870,12 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
   for (fak in source_df$FAKNAVN %>% unique %>% sort) {
     # TODO ta bort gruppering her og seinare i koden, det er ikkje gjort likt på årets og forrige?
     # å gruppere noko som alt er gruppert, vil først fjerne gammal gruppering, så har ikkje noko å seie
-    # 2022: bytta ut Studieprogram_instkode med StudiumID (Kode + namn), gjort for å skilje mellom deltid/heiltid, t.d.
     
     # handterer manglande data, for å ha jamt tal på linjer
-    utd_df <- source_df %>% filter(FAKNAVN == fak) %>% group_by(StudiumID, .drop=FALSE) 
+    utd_df <- source_df %>% filter(FAKNAVN == fak) %>% group_by(Studieprogram_instnr, .drop=FALSE) 
     
     # Sikrar like mange linjer med data
-    prog_n <- utd_df %>% select(StudiumID) %>% unique %>% NROW
+    prog_n <- utd_df %>% select(Studieprogram_instnr) %>% unique %>% NROW
     fak_df <- source_df %>% filter(FAKNAVN == fak) %>% group_by(FAKNAVN)
     
     # Kunne gjort dette utanfor loop, men då må det lagrast til ny variabel 
@@ -883,8 +886,8 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
     
     # Filtrerer bort program som ikkje finst i nyaste datasett
     utd_df_forrige <- source_df_forrige %>% 
-      filter(FAKNAVN == fak, StudiumID %in% source_df$StudiumID) %>% 
-      group_by(StudiumID, .drop=FALSE)
+      filter(FAKNAVN == fak, Studieprogram_instnr %in% source_df$Studieprogram_instnr) %>% 
+      group_by(Studieprogram_instnr, .drop=FALSE)
     
     # Slår saman datasetta til bruk i samanlikning
     df_utd_bound <- bind_rows(utd_df, utd_df_forrige)   
@@ -913,6 +916,7 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
     # Første rad - program/fakultet/OM for alle blokkene
     uthevkol <- c(sc)
     skillekol <- c()
+    prosentkol <- c()
     SB_print_fc(utd_df, fak_df, source_df, sn, sc, sr, ab)
     sc <- sc + 1
     
@@ -932,9 +936,14 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
         SB_sub_print(utd_df, fak_df, source_df, utd_df_forrige, fak_df_forrige, source_df_forrige, ab, sn, sc, sr, prog_n, 
                      utskriftsmal[rad, "Spørsmålstekst"], utskriftsmal[rad, "Variabel"], utskriftsmal[rad, "Tid"])
         
+        # Prosentformatering av enkelte kolonner
+        if (!is.na(utskriftsmal[rad, "Format"]) & utskriftsmal[rad, "Format"] == "prosent") {
+          prosentkol <- append(prosentkol, sc)
+        }
+        
         # Set siste kolonne som kan formaterast etter femdelt skala
         if (siste_likert_kol < 3 & utskriftsmal[rad, "Tid"]) {
-          siste_likert_kol <- sc
+          siste_likert_kol <- sc - 1
         }
         sc <- sc + 1
       }
@@ -953,7 +962,7 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
     # sr <- NROW(tmp_utd_df) + 7
     sr <- prog_n + 7
     # Farge øvst
-    addStyle(ab, sn, SB_style_yellow, rows = 1:qtextRow, cols = 1:lastDataCol, gridExpand = T)
+    addStyle(ab, sn, SB_style_headerbg, rows = 1:qtextRow, cols = 1:lastDataCol, gridExpand = T)
     # addStyle(ab, sn, SB_style_wrap, rows = 2:qtextRow, cols = 1:lastDataCol, gridExpand = T, stack = T)
     addStyle(ab, sn, SB_style_header, rows = 1:2, cols = 1, gridExpand = T, stack = T)
     addStyle(ab, sn, SB_style_bold, rows = 1:2, cols = 1:lastDataCol, gridExpand = T, stack = T)
@@ -968,7 +977,7 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
     
     # Farge på utheva kolonner 
     for (x in uthevkol) {
-      addStyle(ab, sn, SB_style_yellow, rows = firstDataRow:sr, cols = x, gridExpand = T)
+      addStyle(ab, sn, SB_style_headerbg, rows = firstDataRow:sr, cols = x, gridExpand = T)
       addStyle(ab, sn, SB_style_num, rows = firstDataRow:sr, cols = firstDataCol:lastDataCol, gridExpand = T, stack = T)
       addStyle(ab, sn, SB_style_bold, rows = qtextRow:sr, cols = x, gridExpand = T, stack = T)
       addStyle(ab, sn, SB_style_batteryborder, rows = 1:qtextRow, cols = x, gridExpand = T, stack = T)
@@ -977,6 +986,11 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
     # Farge på skillekolonner 
     for (x in skillekol) {
       addStyle(ab, sn, SB_style_lgrey, rows = 1:sr, cols = x, gridExpand = T)
+    }
+    
+    # Prosentformatering
+    for (x in prosentkol) {
+      addStyle(ab, sn, SB_style_perc, rows = firstDataRow:sr, cols = x, gridExpand = T, stack = T)
     }
     
     # https://www.rdocumentation.org/packages/openxlsx/versions/4.2.3/topics/conditionalFormatting
@@ -998,7 +1012,7 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
                           cols = firstDataCol:sc,
                           rows = firstDataRow:sr,
                           rule = diff_neg,
-                          style = SB_style_dred_border
+                          style = SB_style_sig_neg_ramme
     )
     
     # Regel for positiv
@@ -1008,7 +1022,7 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
                           cols = firstDataCol:sc,
                           rows = firstDataRow:sr,
                           rule = diff_pos,
-                          style = SB_style_dgreen_border
+                          style = SB_style_sig_pos_ramme
     )
     
     # Regel for ikkje-signifikant
@@ -1027,17 +1041,17 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
                           rows = firstDataRow:sr,
                           type = "between",
                           rule = godt_resultat,
-                          style = SB_style_lgreen_fill
+                          style = SB_style_pos_res_fyll
     )
     
     # Regel for gode resultat på 1-5 likert
-    svakt_resultat <- c(1, 3.59)
+    svakt_resultat <- c(1, 3)
     conditionalFormatting(ab, sn,
                           cols = firstDataCol:siste_likert_kol,
                           rows = firstDataRow:sr,
                           type = "between",
                           rule = svakt_resultat,
-                          style = SB_style_lred_fill
+                          style = SB_style_svakt_res_fyll
     )
     
     # Lesbarheit
@@ -1269,8 +1283,8 @@ SB_style_wrap <- createStyle(
   wrapText = T
 )
 
-SB_style_yellow <- createStyle(
-  fgFill = "#FFDC00"
+SB_style_headerbg <- createStyle(
+  fgFill = "#FFE757" # "#FFDC00"
 )
 
 SB_style_batteryborder <- createStyle(
@@ -1296,28 +1310,38 @@ SB_style_num <- createStyle(
   numFmt = "#,#0.0"
 )
 
+SB_style_perc <- createStyle(
+  numFmt = "0 %"
+)
+
 SB_style_orange <- createStyle(
   fgFill = "#ffa64d"
 )
 
-SB_style_dred_border <- createStyle(
+# Fargepaletten som har semantisk funksjon, er utforma ved hjelp av denne sida:
+# https://davidmathlogic.com/colorblind/#%2305DE4B-%23EA6A00-%231C8A41-%23EA1A00
+SB_style_pos_res_fyll <- createStyle(
+  bgFill = "#98DCAE" #"#05DE4B"
+)
+
+SB_style_sus_res_fyll <- createStyle(
+  bgFill = "#EFE23F" #"#EA6A00"
+)
+
+SB_style_svakt_res_fyll <- createStyle(
+  bgFill = "#FFA65C" #"#EA6A00"
+)
+
+SB_style_sig_pos_ramme <- createStyle(
   border = "TopBottomLeftRight",
-  borderStyle = "medium",
-  borderColour = "#C00000"
+  borderStyle = "thin",
+  borderColour = "#000000" #"#1C8A41"
 )
 
-SB_style_lred_fill <- createStyle(
-  bgFill = "#FFD1D1"
-)
-
-SB_style_dgreen_border <- createStyle(
+SB_style_sig_neg_ramme <- createStyle(
   border = "TopBottomLeftRight",
-  borderStyle = "medium",
-  borderColour = "#76933C"
-)
-
-SB_style_lgreen_fill <- createStyle(
-  bgFill = "#D8E4BC"
+  borderStyle = "dashed",
+  borderColour = "#000000" #"#EA1A00"
 )
 
 SB_style_differanseblokk <- createStyle(
@@ -1332,6 +1356,8 @@ SB_style_differanseblokk <- createStyle(
 ##** START Utskriftskode 2022 
 ##*
 # 2022 - bytta studieprogram_instkode med StudiumID
+# 2023 - bytta StudiumID med studieprogram_instkode
+# 
 # Denne skriv ut første rad med stikktitlar
 # TODO: rydd denne, kan bli mykje enklare, berre programnamn, fakultet, OsloMet totalt
 # Kommenterer ut alt som har med _forrige å gjere - det trengst ikkje her? 
@@ -1345,7 +1371,7 @@ SB_print_fc <- function(utd_df, fak_df, source_df, sn, sc, sr, ab) {
   writeData(ab, sn, tmp_utd_df[1], sc, sr + 1, colNames = FALSE)
   writeData(ab, sn, "", sc, sr)
   
-  prog_n <- utd_df %>% select(StudiumID) %>% unique %>% NROW
+  prog_n <- utd_df %>% select(Studieprogram_instnr) %>% unique %>% NROW
   writeData(ab, sheet = sn, x = tmp_fak_df[1], startCol = sc, startRow = sr + 2 + prog_n, colNames = FALSE)
   writeData(ab, sheet = sn, x = "OsloMet totalt", startCol = sc, startRow = sr + 4 + prog_n, colNames = FALSE)
   
@@ -1355,7 +1381,7 @@ SB_print_fc <- function(utd_df, fak_df, source_df, sn, sc, sr, ab) {
   writeData(ab, sn, "Antall respondenter", sc, sr)
   sr <- sr + 1
   
-  # Skriv ut StudiumID, fakultetsnamn og OsloMet totalt i første rad
+  # Skriv ut Studieprogram_instnr, fakultetsnamn og OsloMet totalt i første rad
   writeData(ab, sn, tmp_utd_df[1], sc, sr + 1, colNames = FALSE)
   writeData(ab, sheet = sn, x = tmp_fak_df[1], startCol = sc, startRow = sr + 2 + prog_n, colNames = FALSE)
   writeData(ab, sheet = sn, x = "OsloMet totalt", startCol = sc, startRow = sr + 4 + prog_n, colNames = FALSE)
@@ -1365,7 +1391,7 @@ SB_print_fc <- function(utd_df, fak_df, source_df, sn, sc, sr, ab) {
   writeData(ab, sn, "Differanse fra året før", sc, sr)
   sr <- sr + 1
   
-  # Skriv ut StudiumID, fakultetsnamn og OsloMet totalt i første rad
+  # Skriv ut Studieprogram_instnr, fakultetsnamn og OsloMet totalt i første rad
   writeData(ab, sn, tmp_utd_df[1], sc, sr + 1, colNames = FALSE)
   writeData(ab, sheet = sn, x = tmp_fak_df[1], startCol = sc, startRow = sr + 2 + prog_n, colNames = FALSE)
   writeData(ab, sheet = sn, x = "OsloMet totalt", startCol = sc, startRow = sr + 4 + prog_n, colNames = FALSE)
@@ -1374,7 +1400,7 @@ SB_print_fc <- function(utd_df, fak_df, source_df, sn, sc, sr, ab) {
   writeData(ab, sn, "p-verdi", sc, sr)
   sr <- sr + 1
   
-  # Skriv ut StudiumID, fakultetsnamn og OsloMet totalt i første rad
+  # Skriv ut Studieprogram_instnr, fakultetsnamn og OsloMet totalt i første rad
   writeData(ab, sn, tmp_utd_df[1], sc, sr + 1, colNames = FALSE)
   writeData(ab, sheet = sn, x = tmp_fak_df[1], startCol = sc, startRow = sr + 2 + prog_n, colNames = FALSE)
   writeData(ab, sheet = sn, x = "OsloMet totalt", startCol = sc, startRow = sr + 4 + prog_n, colNames = FALSE)
@@ -1393,7 +1419,9 @@ SB_print_batteryheader <- function(htittel, hspørsmål, ab, sn, sc) {
 ##* prøve å flytte bind_rows til OM_print_2022 - hadde vore bra å ikkje gjenta denne for kvar variabel
 ##* - det vil krevje anten å gruppere data i printfunksjon, eller å sende tre samanslåtte df-ar
 ##* - om bruke tre df - truleg bra å då putte alle df-ane i ei liste og sende dei over, for å forenkle kallet
-SB_sub_print <- function(utd_df, fak_df, source_df, utd_df_forrige, fak_df_forrige, source_df_forrige, ab, sn, sc, sr, prog_n, spørsmål, varnamn, tid = FALSE) {
+SB_sub_print <- function(utd_df, fak_df, source_df, 
+                         utd_df_forrige, fak_df_forrige, source_df_forrige, 
+                         ab, sn, sc, sr, prog_n, spørsmål, varnamn, tid = FALSE) {
   tmp_utd_df <- utd_df
   tmp_fak_df <- fak_df
   tmp_OM_df <- source_df 
@@ -1404,8 +1432,8 @@ SB_sub_print <- function(utd_df, fak_df, source_df, utd_df_forrige, fak_df_forri
   # Dersom det er tidsvariablar, må det handterast spesielt
   if (tid) {
     tmp_utd_df <- tmp_utd_df %>% filter(!is.na(tid_brutto))
-    tmp_fak_df <- tmp_fak_df %>% filter(Progresjon == "100 %", !is.na(tid_brutto))
-    tmp_OM_df <- tmp_OM_df %>% filter(Progresjon == "100 %", !is.na(tid_brutto))
+    tmp_fak_df <- tmp_fak_df %>% filter(progresjon == 1, !is.na(tid_brutto))
+    tmp_OM_df <- tmp_OM_df %>% filter(progresjon == 1, !is.na(tid_brutto))
   }
   
   # 2022 SB_utrad_snitt gir no fleire kolonner - bør få nytt namn, og alle bør bli bytta frå SB_ til OM_

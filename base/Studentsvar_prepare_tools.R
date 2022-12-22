@@ -1,4 +1,18 @@
 ##**
+##* Hjelpefunksjonar
+##* 
+##* Hjelpefunksjon for å lett kunne sjå enkeltvariablar
+skrivvar <- function(sdf, variabel) {
+  sdf %>% select({{variabel}}) %>% table(useNA = "ifany") %>% addmargins()
+}
+
+##* For å skrive ut tabell til utklippsbrett
+til_utklipp <- function(sdf) {
+  sdf %>% write.table("clipboard", sep = "\t")
+  return(sdf)
+}
+
+##**
 ##* Funksjonar for førebuing av dataframes
 ##* Ville helst hatt berre ein, men datasetta er ikkje heilt like nok, 
 ##* og det er viktigare å ha same utskriftsfunksjonar
@@ -24,6 +38,27 @@ SB_prepare_2022 <- function(innfil, dataår, instnr) {
   OM[OM==9999] <- NaN # Var NA, bytta 2020 for å skilje mellom ikkje-svar (NA) og Vet ikke (NaN)
   OM <- SB_name_fak_kort(OM)
   OM <- dbh_add_programdata(OM, "studprog_kod", instnr)
+  OM <- SB_add_sum_tid(OM)
+  OM <- SB_prep_indeks(OM)
+  return(OM)
+} 
+
+##* Studiebarometeret
+SB_prepare_2023 <- function(innfil, dataår, instnr) {
+  OM <- read_excel(innfil)
+  OM <- OM %>% mutate(undersøkelse_år = dataår)
+  # I 2022 inneheldt datasettet nokre observasjonar utan studprog_kod/studiepgm_navn
+  # Filtrerer bort slike
+  OM <- OM %>% filter(!is.na(studprog_kod))
+  OM[OM==9999] <- NaN # Var NA, bytta 2020 for å skilje mellom ikkje-svar (NA) og Vet ikke (NaN)
+  OM <- SB_name_fak_kort(OM)
+  if (instnr == 1175) {
+    # legg til programnamn med instituttilhøyrigheit
+    OM <- OM_add_programdata(OM, "studprog_kod")
+    OM <- SB_add_nivå(OM)
+  } else {
+    OM <- dbh_add_programdata(OM, "studprog_kod", instnr)
+  }
   OM <- SB_add_sum_tid(OM)
   OM <- SB_prep_indeks(OM)
   return(OM)
@@ -241,7 +276,7 @@ dbh_add_nivå <- function(sdf) {
         Nivåkode == "ME" ~ "Master",
       Nivåkode == "B3" | 
         (Nivåkode == "M5" & STUDIEAR == 2) |
-        # Takk, Studiebarometeret, i 2020 mangla denne for MxGLU
+        # I 2020 mangla denne for MxGLU
         (Nivåkode == "M5" & is.na(STUDIEAR)) ~ "Bachelor", 
       TRUE ~ "Annet"
     ))
@@ -320,14 +355,28 @@ dbh_hent_studiepoengdata <- function(institusjonsnummer) {
 # OM_fakultetsnavn
 # OM_fakultetskode
 OM_add_programdata <- function(sdf, varnamn) {
-  # TODO: Start å bruke OM_programkode i staden for studieprogramkode/studprog_kod?
-  OM_data <- read.xlsx("../R felles/OM_programdata.xlsx")
-  sdf <- left_join(sdf, OM_data,
-                   by = setNames("OM_programkode", varnamn))
+  OM_programvar <- read_excel("base/OsloMet_programvariabler.xlsx")
+  # OM <- left_join(OM, OM_programvar, "Studieprogramkode")
+  sdf <- left_join(sdf, OM_programvar,
+                   by = setNames("Studieprogramkode", varnamn))
+  sdf <- sdf %>% rename("Studieprogramkode" = !!varnamn)
   return(sdf)
-  # sdf <- sdf %>% rename("OM_programkode" = {{varnamn}})
-  # sdf <- left_join(sdf, OM_data, by="OM_programkode")
-  # sdf <- sdf %>% rename({{varnamn}} := "OM_programkode")
+}
+
+##**
+#* Kodar Nivå-variabel til bruk i filtrering
+SB_add_nivå <- function(sdf) {
+    sdf <- sdf %>% mutate(Nivå = case_when(
+      STUDIENIVAKODE == "M2" |
+        (STUDIENIVAKODE == "M5" & STUDIEAR == 5) |
+        STUDIENIVAKODE == "ME" ~ "Master",
+      STUDIENIVAKODE == "B3" | 
+        (STUDIENIVAKODE == "M5" & STUDIEAR == 2) |
+        # I 2020 mangla denne for MxGLU
+        (STUDIENIVAKODE == "M5" & is.na(STUDIEAR)) ~ "Bachelor", 
+      TRUE ~ "Annet"
+    ))
+  return(sdf)
 }
 
 ## Taldata  ##
@@ -467,11 +516,6 @@ SB_prep_indeks <- function(sdf) {
 ##** Kandidatundersøkelsen - hjelpefunksjonar for å rydde og slå saman data til tidsserie
 ##*
 ##*
-
-# Hjelpefunksjon for å lett kunne sjå enkeltvariablar
-skrivvar <- function(sdf, variabel) {
-  sdf %>% select({{variabel}}) %>% table(useNA = "ifany") %>% addmargins()
-}
 
 ##** Kandidatundersøkinga 2022 - forbered data
 OM_kandidat_setup_2022 <- function(sdf) {
@@ -1159,7 +1203,7 @@ set_hvorforikkeutdannetfor <- function(sdf) {
   return(sdf)
 }
 
-# TODO - desse kan generaliserast ein del, med unntakk av dei som må samanlikne med firedelt skala
+# TODO - desse kan generaliserast ein del, med grepl-varianten
 
 # Lagar variabel fornøydmedoppgaver
 set_fornoydmedoppgaver <- function(sdf, variabel) {

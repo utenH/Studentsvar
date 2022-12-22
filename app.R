@@ -195,17 +195,13 @@ server <- function(input, output) {
     surveyname <- input$surveyname
     levelfilter <- input$levelfilter
     print(paste(surveyname, levelfilter, sep = " - " ))
-    # TODO SB_unntak vart ikkje kalla på?`Yrkesfag manglar nokre program`
-    # koda kjem til unntaket, men namna blir ikkje coalesced?
-    # problemet var at dei manglar Fakultetskode/Fakultetsnavn
-    # fungerer ikkje heilt å coalesce med FAKNAVN, fordi Fakultetsnavn har " (LUI)" med til slutt 
     
     # TODO: legg inn case for å sjekke om ein skal bruke SA_prepare, SB_prepare eller OM_prepare
-    df <- SB_prepare_2022(input$nyastedata$datapath, input$nyastear, input$instnr)
+    df <- SB_prepare_2023(input$nyastedata$datapath, input$nyastear, input$instnr)
     print("Eventuelle programkoder utan Fakultetstilknytning: ") 
     print(df %>% filter(is.na(FAKNAVN)) %>% select(Studieprogramkode) %>% 
             unique)
-    df_previous <- SB_prepare_2022(input$forrigedata$datapath, input$forrigear, input$instnr)
+    df_previous <- SB_prepare_2023(input$forrigedata$datapath, input$forrigear, input$instnr)
     
     workbook <- OM_print_2023(survey = surveyname, source_df = df, source_df_forrige = df_previous,
                               malfil = templatepath, nivå = levelfilter)

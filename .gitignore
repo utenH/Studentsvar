@@ -2,6 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
+.rscignore
 rsconnect
 Rapportfiler
 Rbup
