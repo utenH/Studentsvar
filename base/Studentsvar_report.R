@@ -35,7 +35,6 @@ OM_fritekst_xlsx_2022 <- function(sdf, fritekstvariabler, grupperingsvariabel, s
     
     ## stil
     datalengde <- NROW(gruppe) + 1
-    # TODO finn på noko her
     setColWidths(arbeidsbok, 1, cols = 1:7, widths = c(14, 40, 8, 50, 50, 50, 50))
     # addStyle(arbeidsbok, 1, cols = 5, rows = 2:datalengde, svarkol_stil, gridExpand = T, stack = T)
     addStyle(arbeidsbok, 1, cols = 1:7, rows = 1:datalengde, tabell_stil, gridExpand = T, stack = T)
@@ -825,12 +824,9 @@ OM_print_2022 <- function(survey, source_df, source_df_forrige, malfil = "", niv
   return(ab)
 } # END OM_print_2022
 
-# Lagar arbeidsbokobjekt, med faner per fakultet, samanliknar snitt med året før
+##** 
+##* Lagar arbeidsbokobjekt, med faner per fakultet, samanliknar snitt med året før
 
-# TODO legg inn noko slikt:
-# tar bort fakultetnummer og instituttforkorting frå første kolonne
-# firstColName <- colnames(df_ut)[1]
-# df_ut <- df_ut %>% mutate(!!firstColName := gsub("^\\S+\\s", "", .data[[firstColName]]))
 OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", nivå = "Alle") {
   # Set kva år som skal samanliknast - blir også brukt til å lage samanslått df for t.test
   sisteår <- source_df$undersøkelse_år %>% unique
@@ -916,9 +912,13 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
     # Første rad - program/fakultet/OM for alle blokkene
     uthevkol <- c(sc)
     skillekol <- c()
-    prosentkol <- c()
     SB_print_fc(utd_df, fak_df, source_df, sn, sc, sr, ab)
     sc <- sc + 1
+    
+    # rader til spesialformatering
+    prosentkol <- c()
+    sumtidkol <- NULL
+    progresjonkol <- NULL
     
     ##** Skriv ut basert på xlsx-mal
     # Finn lengde på mal
@@ -939,6 +939,16 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
         # Prosentformatering av enkelte kolonner
         if (!is.na(utskriftsmal[rad, "Format"]) & utskriftsmal[rad, "Format"] == "prosent") {
           prosentkol <- append(prosentkol, sc)
+        }
+        
+        # Lagre kolonne med progresjon - for å kunne formatere Sum tid studier
+        if (!is.na(utskriftsmal[rad, "Variabel"]) & utskriftsmal[rad, "Variabel"] == "progresjon") {
+          progresjonkol <- sc
+        }
+        
+        # Lagre kolonne med Sum tid studier - for å kunne formatere denne
+        if (!is.na(utskriftsmal[rad, "Variabel"]) & utskriftsmal[rad, "Variabel"] == "sum_tid_studier") {
+          sumtidkol <- sc
         }
         
         # Set siste kolonne som kan formaterast etter femdelt skala
@@ -1052,6 +1062,44 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
                           type = "between",
                           rule = svakt_resultat,
                           style = SB_style_svakt_res_fyll
+    )
+    
+    ##**
+    ##* Formatering av Sum tid studier
+    ##* Dersom Sum tid studier / progresjon < landssnitt studier -> svakt_res
+    ##* Dersom Sum tid studier / progresjon er over venta tidsbruk for 1500 t/år -> pos_res
+    landsnitt_tid <- 27
+    tid_minimum <- 34.5
+    tid_maksimum <- 41.5
+    
+    sum_tid_svakt <- paste0(int2col(sumtidkol), firstDataRow, "/", 
+                            int2col(progresjonkol), firstDataRow, "<",
+                            landsnitt_tid)
+    conditionalFormatting(ab, sn,
+                          cols = sumtidkol,
+                          rows = firstDataRow:sr,
+                          rule = sum_tid_svakt,
+                          style = SB_style_svakt_res_fyll
+    )
+    
+    sum_tid_pos <- paste0(int2col(sumtidkol), firstDataRow, "/", 
+                            int2col(progresjonkol), firstDataRow, ">",
+                          tid_minimum)
+    conditionalFormatting(ab, sn,
+                          cols = sumtidkol,
+                          rows = firstDataRow:sr,
+                          rule = sum_tid_pos,
+                          style = SB_style_pos_res_fyll
+    )
+    
+    sum_tid_sus <- paste0(int2col(sumtidkol), firstDataRow, "/", 
+                          int2col(progresjonkol), firstDataRow, ">",
+                          tid_maksimum)
+    conditionalFormatting(ab, sn,
+                          cols = sumtidkol,
+                          rows = firstDataRow:sr,
+                          rule = sum_tid_sus,
+                          style = SB_style_sus_res_fyll
     )
     
     # Lesbarheit
