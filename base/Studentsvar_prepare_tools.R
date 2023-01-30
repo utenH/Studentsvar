@@ -7,8 +7,8 @@ skrivvar <- function(sdf, variabel) {
 }
 
 ##* For å skrive ut tabell til utklippsbrett
-til_utklipp <- function(sdf) {
-  sdf %>% write.table("clipboard", sep = "\t")
+til_utklipp <- function(sdf, radnamn = F) {
+  sdf %>% write.table("clipboard", sep = "\t", row.names = radnamn, dec = ",")
   return(sdf)
 }
 
