@@ -14,6 +14,7 @@ library(openxlsx)
 library(readxl)
 library(stringr)
 library(janitor)
+# library(XLConnect)
 # library(gtools) #usikker på om denne gjer noko
 
 # importer SB_prepare-funksjonar og variabelkoding
@@ -123,7 +124,7 @@ ui <- fluidPage(
   )
 )
 
-# Define server logic required to draw a histogram
+# Define server logic
 server <- function(input, output) {
   
   # Lastar ned fil med snitt per år
@@ -171,6 +172,8 @@ server <- function(input, output) {
     output$valgteVariabler <- renderUI({HTML(variablerTekst)})
   })
   
+  # TODO sjå til downloadData / downloadHandler lenger nede, 
+  # slik at utskrift blir skilt frå å lage arbeidsbok
   observeEvent(input$downloadOpenAnswers, {
     # output$downloadOpenAnswers <- downloadHandler({
   
@@ -179,7 +182,6 @@ server <- function(input, output) {
                                  grupperingsvariabel = input$grupperingsvariabel,
                                  surveynamn = input$surveynamn,
                                  data_ar = input$data_ar)
-
     # print(sdf %>% head)
     
   })
@@ -205,11 +207,13 @@ server <- function(input, output) {
     
     workbook <- OM_print_2023(survey = surveyname, source_df = df, source_df_forrige = df_previous,
                               malfil = templatepath, nivå = levelfilter)
+    
+    # TODO les inn forklaringsark, legg til
     # print(typeof(workbook))
     return(workbook)
   })
   
-  # Gjer sånn at denne kallar på funksjon lenger oppe, som returnerer workbook-objekt
+  # Skriv ut arbeidsbok til fil
   output$downloadData <- downloadHandler(
     filename = function() {
       paste0(input$surveyname, "_", 
