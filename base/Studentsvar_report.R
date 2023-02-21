@@ -35,11 +35,13 @@ OM_fritekst_xlsx_2022 <- function(sdf, fritekstvariabler, grupperingsvariabel, s
     
     ## stil
     datalengde <- NROW(gruppe) + 1
-    setColWidths(arbeidsbok, 1, cols = 1:7, widths = c(14, 40, 8, 50, 50, 50, 50))
+    # TODO Finn ein måte å bestemme dette frå Shiny-appen
+    setColWidths(arbeidsbok, 1, cols = 1:7, widths = c(40, 14, 65, 10, "auto", "auto", "auto"))
     # addStyle(arbeidsbok, 1, cols = 5, rows = 2:datalengde, svarkol_stil, gridExpand = T, stack = T)
     addStyle(arbeidsbok, 1, cols = 1:7, rows = 1:datalengde, tabell_stil, gridExpand = T, stack = T)
     
     ## Save workbook
+    # TODO gjer om slik at utskrift skjer i anna funksjon
     saveWorkbook(wb = arbeidsbok,
                  file = paste0(surveyinfo, "/", gruppenamn, " ",  surveynamn, " ", data_ar, ".xlsx"),
                  overwrite = TRUE, )
@@ -73,14 +75,7 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
   sdf_full <- sdf %>% filter(!is.na(Fakultetsnavn))
   
   # Filtrerer bort program som ikkje er med i siste datasett
-  # sdf <- sdf %>% group_by(Studieprogramkode) %>% filter(arstal_siste %in% gruppe_ar) %>% ungroup
-  # Justert denne for å kunne ha gruppe_ar på forma "2018/2019"
-  # print("Før")
-  # print(sdf %>% nrow)
-  # sdf <- sdf %>% group_by(Studieprogram_instnr) %>% filter(grepl(arstal_siste, gruppe_ar)) %>% ungroup
-  sdf <- sdf %>% group_by(Studieprogram_instnr) %>% filter(arstal_siste %in% gruppe_ar) %>% ungroup
-  # print("Etter")
-  # print(sdf %>% nrow)
+  sdf <- sdf %>% group_by(Studieprogram_instnamn) %>% filter(arstal_siste %in% gruppe_ar) %>% ungroup
   
   surveyinfo <- paste0("Rapportfiler/",survey, " indikatorrapport ", arstal_siste)
   dir.create(surveyinfo)
@@ -254,10 +249,6 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
     
     df_ut <- left_join(df_ut, df_ut_n, by = {{grupperingsvariabel}})
     
-    # Legge til kolonne ved å slå saman første kolonne og N-kolonne, fjernar første kolonne
-    # df_ut <- df_ut %>% mutate(`Studium / N` = paste0(.data[[grupperingsvariabel]], " (", .data[[nkol_siste]] , "/", .data[[nkol_eldre]], ")"))
-    # df_ut <- df_ut %>% select(-1) %>% relocate(last_col(), 1)
-    
     # unngå #NUM! i excel
     df_ut[df_ut == "NaN"] <- NA
     
@@ -401,13 +392,13 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
           
           # velg utskrift basert på utskriftsmal[rad, "Svartype"]
           if (utskriftsmal[rad, "Svartype"] == "fordeling") {
-            # df_ut <- print_fordeling(sdf_fakultet %>% group_by(Studieprogram_instnr_ar), utskriftsmal[rad, "Variabel"])
+            # df_ut <- print_fordeling(sdf_fakultet %>% group_by(Studieprogram_instnamn_ar), utskriftsmal[rad, "Variabel"])
             df_ut <- print_fordeling(sdf_fakultet %>% 
                                        filter(Institutt == instituttliste[1] | Institutt == instituttliste[2]) %>%
-                                       group_by(Studieprogram_instnr_ar), utskriftsmal[rad, "Variabel"])
+                                       group_by(Studieprogram_instnamn_ar), utskriftsmal[rad, "Variabel"])
             df_ut_2 <- print_fordeling(sdf_fakultet %>% 
                                          filter(Institutt != instituttliste[1] & Institutt != instituttliste[2]) %>%
-                                         group_by(Studieprogram_instnr_ar), utskriftsmal[rad, "Variabel"])
+                                         group_by(Studieprogram_instnamn_ar), utskriftsmal[rad, "Variabel"])
             df_ut_fakultet <- print_fordeling(sdf_fakultet %>% group_by(Fakultet_ar), utskriftsmal[rad, "Variabel"])
             # df_ut_OM <- print_fordeling(sdf %>% group_by(OM_ar), utskriftsmal[rad, "Variabel"])
           } else if(utskriftsmal[rad, "Svartype"] == "snitt_as_num" | utskriftsmal[rad, "Svartype"] == "snitt") {
@@ -424,11 +415,11 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
             df_ut <- print_fordeling(sdf_fakultet %>% 
                                        filter(gruppe_ar == arstal_siste,
                                               Institutt == instituttliste[1] | Institutt == instituttliste[2]) %>%
-                                       group_by(Studieprogram_instnr), utskriftsmal[rad, "Variabel"])
+                                       group_by(Studieprogram_instnamn), utskriftsmal[rad, "Variabel"])
             df_ut_2 <- print_fordeling(sdf_fakultet %>% 
                                          filter(gruppe_ar == arstal_siste,
                                                 Institutt != instituttliste[1] & Institutt != instituttliste[2]) %>%
-                                         group_by(Studieprogram_instnr), utskriftsmal[rad, "Variabel"])
+                                         group_by(Studieprogram_instnamn), utskriftsmal[rad, "Variabel"])
             df_ut_fakultet <- print_fordeling(sdf_fakultet %>% filter(gruppe_ar == arstal_siste) %>% 
                                                 group_by(Fakultetsnavn), utskriftsmal[rad, "Variabel"])
           } else if(utskriftsmal[rad, "Svartype"] == "snitt_as_num_single") {
@@ -517,8 +508,8 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
   
   # Førebu datasett
   # TODO flytt group_by til metodekall for fordeling og snitt?
-  sdf_studium_ar <- sdf %>% group_by(Studieprogram_instnr_ar)
-  sdf_studieprogramnavn <- sdf %>% group_by(Studieprogram_instnr)
+  sdf_studium_ar <- sdf %>% group_by(Studieprogram_instnamn_ar)
+  sdf_studieprogramnavn <- sdf %>% group_by(Studieprogram_instnamn)
   
   # Skriv ut ei fil per fakultet - kan sikkert endrast til å bestemme grupperinga etter argument
   print_groups()
@@ -649,6 +640,9 @@ OM_print_2022 <- function(survey, source_df, source_df_forrige, malfil = "", niv
     malrader <- NROW(utskriftsmal)
     # loop gjennom rad for rad
     for (rad in seq(from = 2, nrow((utskriftsmal)))) {
+      if (!is.na(utskriftsmal[rad, "Utheving"]) & utskriftsmal[rad, "Utheving"]) {
+        uthevkol <- append(uthevkol, sc)
+      }
       if (!is.na(utskriftsmal[rad, "Blokkoverskrift"])) {
         # om det er overskriftsrad, legg til skillekolonne
         skillekol <- append(skillekol, sc)
@@ -847,7 +841,7 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
   print(source_df %>% NROW)  
   ##** Skiljer mellom Master og Bachelor
   ##* Endringar i 2022-kode: Sørga for å kode Bachelor/Master i dataframes, sparer kompleksitet her
-  ##* 2023: tilbake til Studieprogram_instnr
+  ##* 2023: tilbake til Studieprogram_instnamn
   ##* nivå kan vere Bachelor, Master eller Annet
   print(source_df %>% select(Nivå) %>% unique())
   if (nivå != "Alle") {
@@ -864,14 +858,11 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
   utskriftsmal <- read.xlsx(malfil)
   
   for (fak in source_df$FAKNAVN %>% unique %>% sort) {
-    # TODO ta bort gruppering her og seinare i koden, det er ikkje gjort likt på årets og forrige?
-    # å gruppere noko som alt er gruppert, vil først fjerne gammal gruppering, så har ikkje noko å seie
-    
     # handterer manglande data, for å ha jamt tal på linjer
-    utd_df <- source_df %>% filter(FAKNAVN == fak) %>% group_by(Studieprogram_instnr, .drop=FALSE) 
+    utd_df <- source_df %>% filter(FAKNAVN == fak) %>% group_by(Studieprogram_instnamn, .drop=FALSE) 
     
     # Sikrar like mange linjer med data
-    prog_n <- utd_df %>% select(Studieprogram_instnr) %>% unique %>% NROW
+    prog_n <- utd_df %>% select(Studieprogram_instnamn) %>% unique %>% NROW
     fak_df <- source_df %>% filter(FAKNAVN == fak) %>% group_by(FAKNAVN)
     
     # Kunne gjort dette utanfor loop, men då må det lagrast til ny variabel 
@@ -882,8 +873,8 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
     
     # Filtrerer bort program som ikkje finst i nyaste datasett
     utd_df_forrige <- source_df_forrige %>% 
-      filter(FAKNAVN == fak, Studieprogram_instnr %in% source_df$Studieprogram_instnr) %>% 
-      group_by(Studieprogram_instnr, .drop=FALSE)
+      filter(FAKNAVN == fak, Studieprogram_instnamn %in% source_df$Studieprogram_instnamn) %>% 
+      group_by(Studieprogram_instnamn, .drop=FALSE)
     
     # Slår saman datasetta til bruk i samanlikning
     df_utd_bound <- bind_rows(utd_df, utd_df_forrige)   
@@ -925,6 +916,9 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
     malrader <- NROW(utskriftsmal)
     # loop gjennom rad for rad
     for (rad in seq(from = 2, nrow((utskriftsmal)))) {
+      if (!is.na(utskriftsmal[rad, "Utheving"]) & utskriftsmal[rad, "Utheving"]) {
+        uthevkol <- append(uthevkol, sc)
+      }
       if (!is.na(utskriftsmal[rad, "Blokkoverskrift"])) {
         # om det er overskriftsrad, legg til skillekolonne
         skillekol <- append(skillekol, sc)
@@ -987,10 +981,11 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
     
     # Farge på utheva kolonner 
     for (x in uthevkol) {
-      addStyle(ab, sn, SB_style_headerbg, rows = firstDataRow:sr, cols = x, gridExpand = T)
-      addStyle(ab, sn, SB_style_num, rows = firstDataRow:sr, cols = firstDataCol:lastDataCol, gridExpand = T, stack = T)
+      addStyle(ab, sn, SB_style_headerbg, rows = firstDataRow:sr, cols = x, gridExpand = T, stack = T)
+      # addStyle(ab, sn, SB_style_lgrey, rows = firstDataRow:sr, cols = x, gridExpand = T, stack = T)
       addStyle(ab, sn, SB_style_bold, rows = qtextRow:sr, cols = x, gridExpand = T, stack = T)
       addStyle(ab, sn, SB_style_batteryborder, rows = 1:qtextRow, cols = x, gridExpand = T, stack = T)
+      addStyle(ab, sn, SB_style_num, rows = firstDataRow:sr, cols = x, gridExpand = T, stack = T)
     }
     
     # Farge på skillekolonner 
@@ -998,7 +993,7 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
       addStyle(ab, sn, SB_style_lgrey, rows = 1:sr, cols = x, gridExpand = T)
     }
     
-    # Prosentformatering
+    # Prosentformatering}
     for (x in prosentkol) {
       addStyle(ab, sn, SB_style_perc, rows = firstDataRow:sr, cols = x, gridExpand = T, stack = T)
     }
@@ -1065,42 +1060,48 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
     )
     
     ##**
+    ##* Usikker på om denne fører til god diskusjon, vi bør ha ein større samtale om tidsbruk
     ##* Formatering av Sum tid studier
     ##* Dersom Sum tid studier / progresjon < landssnitt studier -> svakt_res
     ##* Dersom Sum tid studier / progresjon er over venta tidsbruk for 1500 t/år -> pos_res
-    landsnitt_tid <- 27
-    tid_minimum <- 34.5
-    tid_maksimum <- 41.5
-    
-    sum_tid_svakt <- paste0(int2col(sumtidkol), firstDataRow, "/", 
-                            int2col(progresjonkol), firstDataRow, "<",
-                            landsnitt_tid)
-    conditionalFormatting(ab, sn,
-                          cols = sumtidkol,
-                          rows = firstDataRow:sr,
-                          rule = sum_tid_svakt,
-                          style = SB_style_svakt_res_fyll
-    )
-    
-    sum_tid_pos <- paste0(int2col(sumtidkol), firstDataRow, "/", 
+    landsnitt_tid <- 31
+    # tid_minimum <- 34.5
+    # tid_maksimum <- 41.5
+    # 
+    # sum_tid_svakt <- paste0(int2col(sumtidkol), firstDataRow, "/", 
+    #                         int2col(progresjonkol), firstDataRow, "<",
+    #                         landsnitt_tid)
+    # 
+    # conditionalFormatting(ab, sn,
+    #                       cols = sumtidkol,
+    #                       rows = firstDataRow:sr,
+    #                       rule = sum_tid_svakt,
+    #                       style = SB_style_svakt_res_fyll
+    # )
+    # 
+    # Dersom fagleg tidsbruk er over landssnitt,
+    # rekna på heiltidsstudentar med total tidsbruk mellom 11 og 61, marker grønt
+    sum_tid_pos <- paste0(int2col(sumtidkol), firstDataRow, "/",
                             int2col(progresjonkol), firstDataRow, ">",
-                          tid_minimum)
+                          landsnitt_tid)
+
     conditionalFormatting(ab, sn,
                           cols = sumtidkol,
                           rows = firstDataRow:sr,
                           rule = sum_tid_pos,
                           style = SB_style_pos_res_fyll
     )
-    
-    sum_tid_sus <- paste0(int2col(sumtidkol), firstDataRow, "/", 
-                          int2col(progresjonkol), firstDataRow, ">",
-                          tid_maksimum)
-    conditionalFormatting(ab, sn,
-                          cols = sumtidkol,
-                          rows = firstDataRow:sr,
-                          rule = sum_tid_sus,
-                          style = SB_style_sus_res_fyll
-    )
+    # 
+    # sum_tid_sus <- paste0(int2col(sumtidkol), firstDataRow, "/", 
+    #                       int2col(progresjonkol), firstDataRow, ">",
+    #                       tid_maksimum)
+    # 
+    # conditionalFormatting(ab, sn,
+    #                       cols = sumtidkol,
+    #                       rows = firstDataRow:sr,
+    #                       rule = sum_tid_sus,
+    #                       style = SB_style_sus_res_fyll
+    # )
     
     # Lesbarheit
     setRowHeights(
@@ -1150,7 +1151,7 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
     overskriftsrad <- overskriftsrad + (prog_n + 7)
     diffblokkLast <- overskriftsrad + (prog_n + 5)
     addStyle(ab, sn, SB_style_bold, rows = overskriftsrad, cols = 1, gridExpand = T, stack = T)
-    addStyle(ab, sn, SB_style_differanseblokk, rows = overskriftsrad:diffblokkLast, cols = 1:sc, gridExpand = T, stack = T)
+    addStyle(ab, sn, SB_style_differanseblokk, rows = overskriftsrad:diffblokkLast, cols = 1:lastDataCol, gridExpand = T, stack = T)
     
     # p-verdi
     overskriftsrad <- overskriftsrad + (prog_n + 7)
@@ -1158,6 +1159,15 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
     
     sn <- sn + 1
   } #END sheet loop
+  
+  # TODO Denne krevjer XLConnect + JDK, men JDK-installasjonen feilar
+  # Hentar inn forklaringsark frå mal
+  # forklaringsmal <- "malfiler/Studiebarometeret veiledningsfane.xlsx"
+  #  
+  # forklaring_innhald <- loadWorkbook(forklaringsmal) 
+  # forklaring_fanenamn <- "Forklaring"
+  # addWorksheet(ab, forklaring_fanenamn)
+  # writeData(ab, sheet = forklaring_fanenamn, x = forklaring_innhald)
   
   return(ab)
 } # END OM_print_2023
@@ -1419,7 +1429,7 @@ SB_print_fc <- function(utd_df, fak_df, source_df, sn, sc, sr, ab) {
   writeData(ab, sn, tmp_utd_df[1], sc, sr + 1, colNames = FALSE)
   writeData(ab, sn, "", sc, sr)
   
-  prog_n <- utd_df %>% select(Studieprogram_instnr) %>% unique %>% NROW
+  prog_n <- utd_df %>% select(Studieprogram_instnamn) %>% unique %>% NROW
   writeData(ab, sheet = sn, x = tmp_fak_df[1], startCol = sc, startRow = sr + 2 + prog_n, colNames = FALSE)
   writeData(ab, sheet = sn, x = "OsloMet totalt", startCol = sc, startRow = sr + 4 + prog_n, colNames = FALSE)
   
@@ -1429,7 +1439,7 @@ SB_print_fc <- function(utd_df, fak_df, source_df, sn, sc, sr, ab) {
   writeData(ab, sn, "Antall respondenter", sc, sr)
   sr <- sr + 1
   
-  # Skriv ut Studieprogram_instnr, fakultetsnamn og OsloMet totalt i første rad
+  # Skriv ut Studieprogram_instnamn, fakultetsnamn og OsloMet totalt i første rad
   writeData(ab, sn, tmp_utd_df[1], sc, sr + 1, colNames = FALSE)
   writeData(ab, sheet = sn, x = tmp_fak_df[1], startCol = sc, startRow = sr + 2 + prog_n, colNames = FALSE)
   writeData(ab, sheet = sn, x = "OsloMet totalt", startCol = sc, startRow = sr + 4 + prog_n, colNames = FALSE)
@@ -1439,7 +1449,7 @@ SB_print_fc <- function(utd_df, fak_df, source_df, sn, sc, sr, ab) {
   writeData(ab, sn, "Differanse fra året før", sc, sr)
   sr <- sr + 1
   
-  # Skriv ut Studieprogram_instnr, fakultetsnamn og OsloMet totalt i første rad
+  # Skriv ut Studieprogram_instnamn, fakultetsnamn og OsloMet totalt i første rad
   writeData(ab, sn, tmp_utd_df[1], sc, sr + 1, colNames = FALSE)
   writeData(ab, sheet = sn, x = tmp_fak_df[1], startCol = sc, startRow = sr + 2 + prog_n, colNames = FALSE)
   writeData(ab, sheet = sn, x = "OsloMet totalt", startCol = sc, startRow = sr + 4 + prog_n, colNames = FALSE)
@@ -1448,7 +1458,7 @@ SB_print_fc <- function(utd_df, fak_df, source_df, sn, sc, sr, ab) {
   writeData(ab, sn, "p-verdi", sc, sr)
   sr <- sr + 1
   
-  # Skriv ut Studieprogram_instnr, fakultetsnamn og OsloMet totalt i første rad
+  # Skriv ut Studieprogram_instnamn, fakultetsnamn og OsloMet totalt i første rad
   writeData(ab, sn, tmp_utd_df[1], sc, sr + 1, colNames = FALSE)
   writeData(ab, sheet = sn, x = tmp_fak_df[1], startCol = sc, startRow = sr + 2 + prog_n, colNames = FALSE)
   writeData(ab, sheet = sn, x = "OsloMet totalt", startCol = sc, startRow = sr + 4 + prog_n, colNames = FALSE)
@@ -1563,5 +1573,3 @@ SB_utrad_snitt <- function(sdf, sdf_previous, spørsmål, varnamn) {
   df_ut[df_ut == "NaN"] <- NA
   return(df_ut)
 }
-
-##** END Utskriftskode 2022

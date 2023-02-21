@@ -204,7 +204,7 @@ portefoljedata <- function() {
     mutate(prog_ar = paste(Studieprogramkode, Årstall))
   
   # OM_programvar <- read_excel("base/OsloMet_programvariabler.xlsx")
-  # soknadsdata_namn <- left_join(soknadsdata, OM_programvar, "Studieprogramkode") %>% filter(!is.na(Studieprogram_instnr))
+  # soknadsdata_namn <- left_join(soknadsdata, OM_programvar, "Studieprogramkode") %>% filter(!is.na(Studieprogram_instnamn))
   OM_register <- bind_rows(soknadsdata_slim, studieplassdata_slim)
   return(OM_register)
 }

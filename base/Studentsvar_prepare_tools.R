@@ -356,10 +356,14 @@ dbh_hent_studiepoengdata <- function(institusjonsnummer) {
 # OM_fakultetskode
 OM_add_programdata <- function(sdf, varnamn) {
   OM_programvar <- read_excel("base/OsloMet_programvariabler.xlsx")
-  # OM <- left_join(OM, OM_programvar, "Studieprogramkode")
   sdf <- left_join(sdf, OM_programvar,
                    by = setNames("Studieprogramkode", varnamn))
   sdf <- sdf %>% rename("Studieprogramkode" = !!varnamn)
+  
+  sdf <- sdf %>% mutate(Studieprogram_instnamn = case_when(
+    grepl("GLU", Studieprogramkode) ~ paste0(Studieprogram_instnamn, " (", STUDIEAR, ". studieår)"),
+    T ~ Studieprogram_instnamn
+  ))
   return(sdf)
 }
 
@@ -586,14 +590,6 @@ OM_kandidat_setup_2022 <- function(sdf) {
   sdf$brutto_arslonn_vasket[sdf$brutto_arslonn < 300000] <- NA 
   sdf$brutto_arslonn_vasket[sdf$brutto_arslonn > 1000000] <- NA 
   sdf$brutto_arslonn_vasket[sdf$stillingsandel < 1] <- NA
-  # sdf$brutto_arslonn_vasket[is.na(sdf$stillingsandel) & sdf$brutto_arslonn < 300000] <- NA 
-  # sdf$brutto_arslonn_vasket[is.na(sdf$arbeider_utdannet_til)] <- NA
-  # sdf$brutto_arslonn_vasket[sdf$arbeider_utdannet_til != 1] <- NA 
-  # sdf$brutto_arslonn_vasket[sdf$stillingsandel > 0.8 & sdf$brutto_arslonn < 300000] <- NA 
-  # sdf$brutto_arslonn_vasket[sdf$stillingsandel == 0.8 & sdf$brutto_arslonn < 240000] <- NA 
-  # sdf$brutto_arslonn_vasket[sdf$stillingsandel == 0.6 & sdf$brutto_arslonn < 180000] <- NA 
-  # sdf$brutto_arslonn_vasket[sdf$stillingsandel == 0.5 & sdf$brutto_arslonn < 150000] <- NA 
-  # sdf$brutto_arslonn_vasket[sdf$stillingsandel == 0.4 & sdf$brutto_arslonn < 120000] <- NA 
   
   return(sdf)
 }
@@ -623,19 +619,13 @@ OM_compile_kandidat_data_2022 <- function(path, surveyyear, print = F, filename 
   sdf <- bind_rows(sdf)
   sdf <- OM_clean_kandidat_serie(sdf)
   
-  # bytt ut denne med join på excelfil med programkode, program-, institutt- og fakultetsnamn
   # Hentar programnamn frå dbh
   sdf <- sdf %>% dbh_add_programdata("fs_kode", 1175)
-  # TODO pass på programma som ikkje blir fanga opp med rett fakultet (2019)
   
   # Gruppere år i to
   sdf <- sdf %>% mutate(gruppe_ar = ifelse(undersokelse_ar < 2022,
                                            "2018/2019",
                                            undersokelse_ar))
-  # Legg til bokstavkode for å sortere årstala baklengs
-  # sdf <- sdf %>% mutate(gruppe_ar = ifelse(undersokelse_ar < 2022, 
-  #                                          paste0("bbbb", "2018/2019"), 
-  #                                          paste0("aaaa", undersokelse_ar)))
   
   # legg til programnamn med instituttilhøyrigheit
   OM_programvar <- read_excel("base/OsloMet_programvariabler.xlsx")
@@ -645,9 +635,9 @@ OM_compile_kandidat_data_2022 <- function(path, surveyyear, print = F, filename 
   sdf <- sdf %>% filter(`_fs_kode` != "SKUT-MA" | is.na(`_fs_kode` != "SKUT-MA"))
 
   # Desse gir så ulike resultat at dei må handterast som ulike program.
-  sdf <- sdf %>% mutate(Studieprogram_instnr = case_when(
-    Studieprogramkode == "ESTDTK-BA" & `_fs_kode` == "PPUDTK" ~ paste(Studieprogram_instnr, "m. PPU"),
-    T ~ Studieprogram_instnr
+  sdf <- sdf %>% mutate(Studieprogram_instnamn = case_when(
+    Studieprogramkode == "ESTDTK-BA" & `_fs_kode` == "PPUDTK" ~ paste(Studieprogram_instnamn, "m. PPU"),
+    T ~ Studieprogram_instnamn
   ))
   
   ##** 
@@ -665,7 +655,7 @@ OM_compile_kandidat_data_2022 <- function(path, surveyyear, print = F, filename 
   # for å kunne gruppere før utskrift, slik at data kjem på ei linje per år
   sdf <- sdf %>% mutate(Studium_ar = paste(Studieprogramnavn, gruppe_ar))
   sdf <- sdf %>% mutate(StudiumID_ar = paste(StudiumID, gruppe_ar))
-  sdf <- sdf %>% mutate(Studieprogram_instnr_ar = paste(Studieprogram_instnr, gruppe_ar))
+  sdf <- sdf %>% mutate(Studieprogram_instnamn_ar = paste(Studieprogram_instnamn, gruppe_ar))
   sdf <- sdf %>% mutate(Fakultet_ar = paste(Fakultetsnavn, gruppe_ar))
   sdf <- sdf %>% mutate(OM_ar = paste("OsloMet", gruppe_ar))
   sdf <- sdf %>% mutate(Institusjon = "OsloMet")
@@ -678,8 +668,6 @@ OM_compile_kandidat_data_2022 <- function(path, surveyyear, print = F, filename 
   
   sdf <- sdf %>% filter(Studieprogramkode != "FAMA", Studieprogramkode != "FMAN", 
                         Studieprogramkode != "ABY", Studieprogramkode != "YLMKH")
-  
-  #**
   
   sdf <- OM_kandidat_setup_2022(sdf)
   
@@ -707,7 +695,6 @@ OM_set_undersokelse_ar <- function(sdf, year) {
   if (is.null(sdf$undersokelse_ar)) {
     sdf <- sdf %>% mutate(undersokelse_ar = year)
   }
-  # print(sdf$undersokelse_ar %>% unique())
   return(sdf)
 }
 
@@ -843,38 +830,6 @@ set_fylke <- function(sdf, variabel) {
   
   return(sdf)
 }
-
-# OBS - Stor variasjon i svar mellom år, har oppdatert a5_hovedaktivitet til å få med alle alternativ i 2018+2019+2022
-# # Endrar variabel for hovedaktivitet
-# set_hovedaktivitet <- function(sdf) {
-#   sdf <- sdf %>% mutate(hovedaktivitet = case_when(
-#     hovedaktivitet == "Ansatt i fast stilling (inkl. prøvetid)" | hovedaktivitet == "Ansatt i fast stilling" ~ "Fast stilling",
-#     hovedaktivitet == "Ansatt i vikariat eller annen midlertidig stilling med varighet mer enn 6 måneder" |
-#       hovedaktivitet == "Ansatt i vikariat eller annen midlertidig stilling med varighet 6 måneder eller mer" ~ "Midlertidig, lang",
-#     hovedaktivitet == "Ansatt i vikariat eller annen midlertidig stilling med varighet mindre enn 6 måneder" | 
-#       hovedaktivitet == "Ansatt i vikariat eller annen midlertidig stilling med kortere varighet enn 6 måneder" ~ "Midlertidig, kort",
-#     hovedaktivitet == "Selvstendig næringsdrivende"  ~ "Selvstendig næringsdrivende",
-#     hovedaktivitet == "Arbeidssøkende" ~ "Arbeidssøkende",
-#     hovedaktivitet == "Annet" ~ "Annet"
-#   )) 
-#   return(sdf)
-# }
-
-# OBS - Stor variasjon i svar mellom år, har oppdatert a5_hovedaktivitet til å få med alle alternativ i 2018+2019+2022
-# # Lagar variabel for hovedaktivitet, variant
-# set_a6_hovedaktivitet <- function(sdf) {
-#   sdf <- sdf %>% mutate(a6_hovedaktivitet = case_when(
-#     Hva.er.din.hovedbeskjeftigelse. == "Ansatt i fast stilling (inkl. prøvetid)" | Hva.er.din.hovedbeskjeftigelse. == "Ansatt i fast stilling" ~ "1-Fast stilling",
-#     Hva.er.din.hovedbeskjeftigelse. == "Ansatt i vikariat eller annen midlertidig stilling med varighet mer enn 6 måneder" | 
-#       Hva.er.din.hovedbeskjeftigelse. == "Ansatt i vikariat eller annen midlertidig stilling med varighet 6 måneder eller mer" ~ "2-Midlertidig stilling, lang",
-#     Hva.er.din.hovedbeskjeftigelse. == "Ansatt i vikariat eller annen midlertidig stilling med varighet mindre enn 6 måneder" | 
-#       Hva.er.din.hovedbeskjeftigelse. == "Ansatt i vikariat eller annen midlertidig stilling med kortere varighet enn 6 måneder" ~ "3-Midlertidig stilling, kort",
-#     Hva.er.din.hovedbeskjeftigelse. == "Selvstendig næringsdrivende" ~ "4-Selvstendig næringsdrivende",
-#     Hva.er.din.hovedbeskjeftigelse. == "Arbeidssøkende" ~ "5-Arbeidssøkende",
-#     Hva.er.din.hovedbeskjeftigelse. == "Annet" ~ "6-Annet" 						
-#   )) 
-#   return(sdf)
-# }
 
 # Lagar variabel for hovedaktivitet, variant
 # TODO gjere om til integer med label
@@ -1019,16 +974,6 @@ set_stillingsbrøk <- function(sdf) {
   ))
   return(sdf)
 }
-
-# # Lagar variabel heltidsstilling
-# set_heltidsstilling <- function(sdf, variabel) {
-#   sdf <- sdf %>% mutate(heltidsstilling = case_when(
-#     {{variabel}} == "100%" ~ 1,
-#     (!is.na({{variabel}}) & {{variabel}} != "Vet ikke") ~ 0,
-#     {{variabel}} == "Vet ikke" ~ NaN
-#   ))
-#   return(sdf)
-# }
 
 # Lagar variabel ufrivilligdeltid
 set_ufrivilligdeltid <- function(sdf, variabel) {
@@ -1254,7 +1199,6 @@ set_forberedtforoppgaver <- function(sdf, variabel) {
   var_string <- deparse(substitute(variabel))
   sdf[[var_string]] <- label_forberedtforoppgaver(sdf[[var_string]])
   
-  # sdf$forberedtforoppgaver <- label_forberedtforoppgaver(sdf$forberedtforoppgaver)
   return(sdf)
 }
 
@@ -1511,7 +1455,6 @@ SA_text_to_numerallevels_nyvar <- function(sdf, nyvar, originalvar) {
 ##* 
 ##* hovedaktivitet
 OM_rekode_2022_hovedaktivitet <- function(sdf) {
-  # print(paste("hovedakt annet", sdf %>% filter(hovedaktivitet == "Annet") %>% count))
   sdf <- sdf %>% mutate(hovedaktivitet = case_when(
     hovedaktivitet_fritekst == "Ansatt fast 100% + student 50%" & undersokelse_ar == 2018 ~ "Ansatt i fast stilling",
     hovedaktivitet_fritekst == "Ansatt i fast full jobb med deltidsstudier i et mastergradsprogramm" & undersokelse_ar == 2019 ~ "Ansatt i fast stilling",
@@ -1550,7 +1493,6 @@ OM_rekode_2022_hovedaktivitet <- function(sdf) {
     hovedaktivitet_fritekst == "Vikariat, men inn i fast stilling høst 2018" & undersokelse_ar == 2018 ~ "Midlertidig",
     hovedaktivitet_fritekst == "Fast ansatt & selvstendig næringsdrivende" & undersokelse_ar == 2019 ~ "Ansatt i fast stilling",
     T ~ hovedaktivitet))
-  # print(sdf %>% filter(hovedaktivitet == "Annet") %>% count)
   
   return(sdf)
 }
@@ -1570,16 +1512,13 @@ OM_rekode_2022_stillingsandel <- function(sdf) {
     hovedaktivitet_fritekst == "Jobber i en deltidsfast stilling som ikke er relevant for ingeniør utdanningen min." & undersokelse_ar == 2018 ~ 0.5,
     hovedaktivitet_fritekst == "Jobber en tilnærmet 80% stilling men har ikke noe fast da jeg ikke er sikker på hva jeg skal eller hvor jeg skal være." & undersokelse_ar == 2018 ~ 0.8,
     T ~ stillingsandel))
-  # print(sdf %>% filter(is.na(stillingsandel)) %>% count)
   
   return(sdf)
 }
 
 #* studerer_niva
 OM_rekode_2022_studerer_niva <- function(sdf) {
-  # print(paste("studerer_niva NA", sdf %>% filter(is.na(studerer_niva)) %>% count))
   sdf <- sdf %>% mutate(studerer_niva = case_when(
-    # hovedaktivitet_fritekst == "studerer også en videreutdanning" & undersokelse_ar == 2018 ~ "Annet",
     hovedaktivitet_fritekst == "Studerer til å bli sykepleier" & undersokelse_ar == 2022 ~ "Bachelor",
     hovedaktivitet_fritekst == "Jeg går et masterstudium, som er ferdig nå i juni. Jobber deltid ved siden av." & undersokelse_ar == 2022 ~ "Master",
     hovedaktivitet_fritekst == "Masterstudent (heltid). Studentmedarbeider i kommunikasjon (deltid)." & undersokelse_ar == 2022 ~ "Master",
@@ -1589,7 +1528,6 @@ OM_rekode_2022_studerer_niva <- function(sdf) {
     hovedaktivitet_fritekst == "Vikariat og masterstudent" & undersokelse_ar == 2018 ~ "Master",
     studerer_niva == "Ph.D." ~ "Annet",
     T ~ studerer_niva))
-  # print(sdf %>% filter(is.na(studerer_niva)) %>% count)
   
   return(sdf)
 }
@@ -1597,101 +1535,102 @@ OM_rekode_2022_studerer_niva <- function(sdf) {
 
 ##**
 ##* Variabellister brukt til å bygge indeksar i Studiebarometeret
+##* 2023 - kommenterte ut indx_... desse er ikkje i bruk no
 ##* 
 
 # Undervisning
+# NOKUT-indeks: "indeks_underv_18"
 var_underv <- c(
   "underv_engasj_18",
   "underv_formidl_18",
   "underv_pensum_18",
   "underv_aktiv_18"
-  # "indeks_underv_18"
 )
-indx_underv <- c(
-  "indx_underv4"
-)
+# indx_underv <- c(
+#   "indx_underv4"
+# )
 
 # Tilbakemelding og veiledning
+# NOKUT-indeks: "indeks_tilbveil_16"
 var_tilbveil <- c(
   "tilbveil_antall_16",
   "tilbveil_konstru_13",
   "tilbveil_student_18",
   "tilbveil_fagdisk_18"
-  # "indeks_tilbveil_16"
 )
-indx_tilbveil <- c(
-  "indx_tilbveil4"
-)
+# indx_tilbveil <- c(
+#   "indx_tilbveil4"
+# )
 
 # Faglig og sosialt læringsmiljø
+# NOKUT-indeks: "indeks_psymiljo_15"
 var_psymiljo <- c(
   "miljo_sosial_13",
   "miljo_fag_13",
   "miljo_studans_15"
-  # "indeks_psymiljo_15"
 )
-indx_psymiljo <- c(
-  "indx_psymiljo3"
-)
+# indx_psymiljo <- c(
+#   "indx_psymiljo3"
+# )
 
 # indeks Fysisk læringsmiljø
+# NOKUT-indeks: "indeks_fysmiljo_13"
 var_fysmiljo <- c(
   "miljo_lokaler_13",
   "miljo_utstyr_13",
   "miljo_biblio_13",
   "miljo_ikt_13"
-  # "indeks_fysmiljo_13"
 )
-indx_fysmiljo <- c(
-  "indx_fysmiljo4"
-)
+# indx_fysmiljo <- c(
+#   "indx_fysmiljo4"
+# )
 
 # Organisering
+# NOKUT-indeks: "indeks_organ_17"
 var_organ <- c(
   "organ_tilgjinfo_17",
   "organ_kvalinfo_17",
   "organ_admtilr_17",
   "organ_fagligsam_17"
-  # "indeks_organ_17"
 )
-indx_organ <- c(
-  "indx_organ4"
-)
+# indx_organ <- c(
+#   "indx_organ4"
+# )
 
 #indeks Vurderingsformer
+# NOKUT-indeks: "indeks_vurd_17"
 var_vurd <- c(
   "vurd_pensum_13",
   "vurd_forstaelse_13",
   # "vurd_laert_17", # OBS MANGLAR I 2020
   "vurd_kriterier_17",
   "vurd_fagutv_17"
-  # "indeks_vurd_17"
 )
-indx_vurd <- c(
-  "indx_vurd5"
-)
+# indx_vurd <- c(
+#   "indx_vurd5"
+# )
 
 # medvirkning
+# NOKUT-indeks: "indeks_medvirk_18"
 var_medv <- c(
   "medvirk_innspill_18"
   # "medvirk_oppfolg_18",
   # "medvirk_tillitsv_18"
-  # "indeks_medvirk_18"
 )
-indx_medv <- c(
-  "indx_medv3"
-)
+# indx_medv <- c(
+#   "indx_medv3"
+# )
 
 #indeks Inspirerende program
+# NOKUT-indeks: "indeks_insp_14"
 var_insp <- c(
   "insp_stimul_13",
   "insp_utfordr_13",
   "insp_motivasjon_14"
-  # "indeks_insp_14"
 )
-indx_insp <- c(
-  "indx_insp3"
-)
+# indx_insp <- c(
+#   "indx_insp3"
+# )
 
 # Læringsutbytte
 var_laerutb <- c(
@@ -1706,33 +1645,33 @@ var_laerutb <- c(
   "laerutb_tenke_13",
   "laerutb_selvst_13"
 )
-indx_laerutb <- c(
-  "indx_laerutb10"
-)
+# indx_laerutb <- c(
+#   "indx_laerutb10"
+# )
 
 # Eget engasjement
+# NOKUT-indeks: "indeks_egeteng_14"
 var_egeteng <- c(
   "egeteng_motivert_14",
   "egeteng_orgakt_14",
   "egeteng_forberedt_14",
   "egeteng_innsats_14"
-  # "indeks_egeteng_14"
 )
-indx_egeteng <- c(
-  "indx_eget4"
-)
+# indx_egeteng <- c(
+#   "indx_eget4"
+# )
 
 # Faglig ansattes forventninger
+# NOKUT-indeks: "indeks_forvent_16"
 var_forvent <- c(
   "forvent_klare_16",
   "forvent_forberedt_16",
   "forvent_deltar_16",
   "forvent_fagamb_16"
-  # "indeks_forvent_16"
 )
-indx_forvent <- c(
-  "indx_forvent4"
-)
+# indx_forvent <- c(
+#   "indx_forvent4"
+# )
 
 # Digitale verktøy
 var_digitale <- c(
@@ -1741,9 +1680,9 @@ var_digitale <- c(
   "digitale_opplaer_18",
   "digitale_laerplatt_18"
 )
-indx_digitale <- c(
-  "indx_digit4"
-)
+# indx_digitale <- c(
+#   "indx_digit4"
+# )
 
 # Overordnet tilfredshet
 var_overord <- c(
@@ -1756,9 +1695,9 @@ var_tidsbruk <- c(
   "tidsbruk_egeninns_14",
   "tidsbruk_arbeid_14"
 )
-indx_sum_tid <- c(
-  "sum_tid"
-)
+# indx_sum_tid <- c(
+#   "sum_tid"
+# )
 # Praksis - endra i 2020
 var_praksis <- c(
   "praksis_forber_14",
@@ -1768,10 +1707,6 @@ var_praksis <- c(
   "praksis_relevant_19",
   "praksis_grunnlagdisk_19"
 )
-# ikkje bruk
-# indx_praksis <- c(
-#   "indx_praksis8"
-# )
 
 # Yrkesrelevans
 var_yrkrel <- c(
@@ -1782,6 +1717,6 @@ var_yrkrel <- c(
   "yrkrel_bidrar_19",
   "yrkrel_prosjekt_19"
 )
-indx_yrkrel <- c(
-  "indx_yrkrel6"
-)
+# indx_yrkrel <- c(
+#   "indx_yrkrel6"
+# )
