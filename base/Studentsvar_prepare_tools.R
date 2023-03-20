@@ -12,6 +12,9 @@ til_utklipp <- function(sdf, radnamn = F) {
   return(sdf)
 }
 
+# Gjer det mogleg å til dømes filtrere på programkode som ikkje finst i studiebarometerfila
+`%!in%` <- Negate(`%in%`)
+
 ##**
 ##* Funksjonar for førebuing av dataframes
 ##* Ville helst hatt berre ein, men datasetta er ikkje heilt like nok, 
@@ -1341,6 +1344,7 @@ OM_janei_bin <- function(sdf, svar) {
     grepl("Yes", {{svar}}) ~ 1,
     grepl("Nei", {{svar}}) ~ 0,
     grepl("No", {{svar}}) ~ 0,
+    grepl("Ønsker ikke å svare på dette spørsmålet", {{svar}}) ~ NaN,
     grepl("Vet ikke", {{svar}}) ~ NaN,
     grepl("Do not know", {{svar}}) ~ NaN,
     grepl("Usikker", {{svar}}) ~ NaN,

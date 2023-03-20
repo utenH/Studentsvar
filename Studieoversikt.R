@@ -17,6 +17,22 @@ portefolje_prep_sistears <- function() {
 }
 
 ##** 
+##* Uteksaminerte, data henta frå justert Tableau-tabell GSP1
+##* 
+
+prep_uteksaminerte <- function(datafil = "../../Studieportefølje/Uteksaminerte 2018–2022.xlsx") {
+  uteksaminerte <- read_excel(datafil, skip = 1)
+  uteksaminerte <- uteksaminerte %>% fill(Fakultet, `NSD nivå`)
+  uteksaminerte <- uteksaminerte %>% mutate(Studieprogramkode = word(Studieprogram, 1))
+  uteksaminerte <- uteksaminerte %>% mutate(Nivå = word(`NSD nivå`, 1))
+  uteksaminerte <- uteksaminerte %>% filter(Fakultet != "Grand Total")
+  uteksaminerte <- uteksaminerte %>% filter(Nivå %in% c("AR", "HK", "B3", "M2", "M5", "ME"))
+  # uteksaminerte <- uteksaminerte %>% mutate(across(starts_with("20"),  ~replace_na(., 0)))
+  uteksaminerte <- uteksaminerte %>% mutate(gjennomsnitt_uteks = rowMeans(select(., "2020", "2021", "2022"), na.rm = T))
+  return(uteksaminerte)
+}
+
+##** 
 ##* Førebu datasett for fullførte kvalifikasjonar
 ##* 
 ##* Lagar alle delsetta som trengst og slår dei saman
