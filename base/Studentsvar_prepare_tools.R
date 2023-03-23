@@ -363,10 +363,13 @@ OM_add_programdata <- function(sdf, varnamn) {
                    by = setNames("Studieprogramkode", varnamn))
   sdf <- sdf %>% rename("Studieprogramkode" = !!varnamn)
   
-  sdf <- sdf %>% mutate(Studieprogram_instnamn = case_when(
-    grepl("GLU", Studieprogramkode) ~ paste0(Studieprogram_instnamn, " (", STUDIEAR, ". studieår)"),
-    T ~ Studieprogram_instnamn
-  ))
+  # Om det er Studiebarometerdata, kan vi skilje mellom 2. og 5. år på grunnskulelærarutdanninga
+  if ("STUDIEAR" %in% (dbh_program_OM %>% names)) {
+    sdf <- sdf %>% mutate(Studieprogram_instnamn = case_when(
+      grepl("GLU", Studieprogramkode) ~ paste0(Studieprogram_instnamn, " (", STUDIEAR, ". studieår)"),
+      T ~ Studieprogram_instnamn
+    ))
+  }
   return(sdf)
 }
 

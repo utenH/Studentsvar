@@ -21,7 +21,7 @@ portefolje_prep_sistears <- function() {
 ##* 
 
 prep_uteksaminerte <- function(datafil = "../../Studieportefølje/Uteksaminerte 2018–2022.xlsx") {
-  uteksaminerte <- read_excel(datafil, skip = 1)
+  uteksaminerte <- read_excel(datafil, sheet = "Fra Tableau", skip = 1)
   uteksaminerte <- uteksaminerte %>% fill(Fakultet, `NSD nivå`)
   uteksaminerte <- uteksaminerte %>% mutate(Studieprogramkode = word(Studieprogram, 1))
   uteksaminerte <- uteksaminerte %>% mutate(Nivå = word(`NSD nivå`, 1))
