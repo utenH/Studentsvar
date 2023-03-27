@@ -876,10 +876,10 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
 # Eksportere datapakke per fakultet til programrapport - fane for kvar utdanning
 # tidsserie - liste med datasett Studiebarometeret per siste tre år
 # SA - datasett for siste tre år i Sisteårsstudenten
-# SA_tidsserie21 <- rbind(SA22, SA21, SA20)
+# SA_tidsserie <- bind_rows(SA23, SA22, SA21)
 # tidsserie <- list(SB19, SB20, SB21)
 # 2022 august: bytta studprog_kod til Studieprogramkode, studieprogram_instkode til StudiumID
-datapakke_print_2022 <- function(tidsserie, SA, SB_fil = "", part = "") {
+datapakke_print_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part = "") {
   # Plan: 
   # Splitt på fakultet
   # Lag filnamn per fakultet
@@ -888,11 +888,11 @@ datapakke_print_2022 <- function(tidsserie, SA, SB_fil = "", part = "") {
   # Lagre fil, gå til neste fakultet
   
   # Del opp datasett, eldst til nyast
-  # bruk tidsserie[[x]] for å velje
+  # bruk SB_tidsserie[[x]] for å velje
   # OBS oppdatere årstal
-  Y1 <- tidsserie[[1]] %>% mutate(år = "2019")
-  Y2 <- tidsserie[[2]] %>% mutate(år = "2020")
-  Y3 <- tidsserie[[3]] %>% mutate(år = "2021")
+  Y1 <- SB_tidsserie[[1]] %>% mutate(år = "2019")
+  Y2 <- SB_tidsserie[[2]] %>% mutate(år = "2020")
+  Y3 <- SB_tidsserie[[3]] %>% mutate(år = "2021")
   
   # ved å sette vektoren indikatorliste og funksjonen slim_variables til år-spesifikke versjonar,
   # kan resten av koden vere lik frå år til år
@@ -1013,7 +1013,7 @@ datapakke_print_2022 <- function(tidsserie, SA, SB_fil = "", part = "") {
       ##**
       ##* Lag tabell for spørsmål frå Sisteårsstudenten
       ##* 
-      sa_utd <- SA %>% filter(Studieprogramkode == utd_id)
+      sa_utd <- SA_tidsserie %>% filter(Studieprogramkode == utd_id)
       # sa_utdata <- c()
       # print(utd_id)
       # Treng ikkje gjere dette viss det ikkje finst sisteårsdata
@@ -1136,7 +1136,7 @@ datapakke_print_2022 <- function(tidsserie, SA, SB_fil = "", part = "") {
     }
     
     # Lagar dataframe med resultat frå Sisteårs som _ikkje_ er med i Studiebarometeret
-    SA_not_in_SB <- SA %>% filter(programkode %!in% (ys$Studieprogramkode))
+    SA_not_in_SB <- SA_tidsserie %>% filter(programkode %!in% (ys$Studieprogramkode))
     SA_not_in_SB <- SA_not_in_SB %>% filter(fakultet == fak_n)
     
     # Hente Studieprogramnavn frå DBH
@@ -1175,7 +1175,7 @@ datapakke_print_2022 <- function(tidsserie, SA, SB_fil = "", part = "") {
       ##**
       ##* Lag tabell for spørsmål frå Sisteårsstudenten
       ##* 
-      sa_utd <- SA %>% filter(Studieprogramkode == utd_id)
+      sa_utd <- SA_tidsserie %>% filter(Studieprogramkode == utd_id)
       # sa_utdata <- c()
       # print(utd_id)
       
@@ -1280,7 +1280,7 @@ datapakke_print_2022 <- function(tidsserie, SA, SB_fil = "", part = "") {
   } # END print loop
   # *****************
   
-} # END datapakke_print_2022
+} # END datapakke_print_2023
 
 # Signifikanstestar endring i snitt mellom år
 # varc er variabelen ein skal samanlikne, varc2 er grupperingsvariabel
@@ -1383,16 +1383,16 @@ datapakke_indikatorliste22 <- (c(
 
 # TODO: etterlign oppsett på programnivå
 # Eksportere datapakke til fakultetsrapport - OsloMet-tal og per fakultet
-# tidsserie - liste med datasett Studiebarometeret per siste tre år
-# SA - datasett for siste tre år i Sisteårsstudenten
+# SB_tidsserie - liste med datasett Studiebarometeret per siste tre år
+# SA_tidsserie - datasett for siste tre år i Sisteårsstudenten
 # nivå - 0 for bachelor, 1 for master
-datapakke_print_aggregert_2022 <- function(tidsserie, SA, SB_fil = "", part = "", nivå = "") {
+datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part = "", nivå = "") {
   # Del opp datasett, eldst til nyast, sett inn årstal
-  # bruk tidsserie[[x]] for å velje
+  # bruk SB_tidsserie[[x]] for å velje
   # OBS oppdatere årstal
-  Y1 <- tidsserie[[1]] %>% mutate(år = "2019")
-  Y2 <- tidsserie[[2]] %>% mutate(år = "2020")
-  Y3 <- tidsserie[[3]] %>% mutate(år = "2021")
+  Y1 <- SB_tidsserie[[1]] %>% mutate(år = "2019")
+  Y2 <- SB_tidsserie[[2]] %>% mutate(år = "2020")
+  Y3 <- SB_tidsserie[[3]] %>% mutate(år = "2021")
   
   if (nivå != "") {
     Y1 <- Y1 %>% filter(master == nivå)
@@ -1402,11 +1402,11 @@ datapakke_print_aggregert_2022 <- function(tidsserie, SA, SB_fil = "", part = ""
     if (nivå == 0) {
       titlepart <- "bachelor"
       part <- paste(" bachelor", part)
-      SA <- SA %>% filter(master == "BA" | master == "4-årig studium" | master == "HK")
+      SA_tidsserie <- SA_tidsserie %>% filter(master == "BA" | master == "4-årig studium" | master == "HK")
     } else if (nivå == 1) {
       titlepart <- "master"
       part <- paste(" master", part)
-      SA <- SA %>% filter(master == "MA")
+      SA_tidsserie <- SA_tidsserie %>% filter(master == "MA")
     }
   }
   
@@ -1497,7 +1497,7 @@ datapakke_print_aggregert_2022 <- function(tidsserie, SA, SB_fil = "", part = ""
   
   # Lag tabell for spørsmål frå Sisteårsstudenten
   # Snitt
-  sa_utdata <- SA %>% group_by(år) %>% 
+  sa_utdata <- SA_tidsserie %>% group_by(år) %>% 
     summarise(
       mean(flerkulturell_kompetanse, na.rm = T), 
       mean(nettbasert_internasjonalt, na.rm = T), 
@@ -1510,7 +1510,7 @@ datapakke_print_aggregert_2022 <- function(tidsserie, SA, SB_fil = "", part = ""
   sa_utdata[sa_utdata == "NaN"] <- NA
   
   # N
-  sa_utdata_n <- SA %>% group_by(år) %>% 
+  sa_utdata_n <- SA_tidsserie %>% group_by(år) %>% 
     summarise(
       sum(!is.na(flerkulturell_kompetanse)), 
       sum(!is.na(nettbasert_internasjonalt)), 
@@ -1634,7 +1634,7 @@ datapakke_print_aggregert_2022 <- function(tidsserie, SA, SB_fil = "", part = ""
     # print(utdata %>% names)
     
     # Lag tabell for spørsmål frå Sisteårsstudenten
-    sa_f <- SA %>% filter(fakultet == fak_n)
+    sa_f <- SA_tidsserie %>% filter(fakultet == fak_n)
     
     # Snitt
     sa_utdata <- sa_f %>% group_by(år) %>% 
@@ -1755,7 +1755,7 @@ datapakke_print_aggregert_2022 <- function(tidsserie, SA, SB_fil = "", part = ""
   # Lagre fil
   saveWorkbook(wb, SB_fil, overwrite = TRUE)
   
-} # END datapakke_print_aggregert_2022
+} # END datapakke_print_aggregert_2023
 
 
 # Fritekst ------------------------------------------------------------------------------------
