@@ -917,7 +917,7 @@ datapakke_print_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part =
   for (fak in ys_fak) {
     fak_n <- fak[1,]$fakultet
     path <- "C:\\Users\\kyrremat\\OneDrive - OsloMet\\Dokumenter\\statistikk\\Kvalitetsrapport datapakke R\\rapportfiler\\"
-    nameroot <- "datapakke 2022"
+    nameroot <- "datapakke 2023"
     # if (part == "") part <- " testrapport"
     suf <- ".xlsx"
     # print(fak_n)
@@ -1451,7 +1451,7 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
   
   # Filnamn
   path <- "C:\\Users\\kyrremat\\OneDrive - OsloMet\\Dokumenter\\statistikk\\Kvalitetsrapport datapakke R\\rapportfiler\\"
-  nameroot <- "OsloMet datapakke 2022 aggregert"
+  nameroot <- "OsloMet datapakke 2023 aggregert"
   # if (part == "") part <- " testrapport"
   suf <- ".xlsx"
   # print(fak_n)
