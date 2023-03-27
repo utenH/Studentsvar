@@ -890,18 +890,19 @@ datapakke_print_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part =
   # Del opp datasett, eldst til nyast
   # bruk SB_tidsserie[[x]] for å velje
   # OBS oppdatere årstal
+  # TODO 2023 - handtere fleire årstal enn tre
   Y1 <- SB_tidsserie[[1]] %>% mutate(år = "2020")
   Y2 <- SB_tidsserie[[2]] %>% mutate(år = "2021")
   Y3 <- SB_tidsserie[[3]] %>% mutate(år = "2022")
   
-  # ved å sette vektoren indikatorliste og funksjonen slim_variables til år-spesifikke versjonar,
+  # ved å sette vektoren indikatorliste_SB og funksjonen slim_variables_SB til år-spesifikke versjonar,
   # kan resten av koden vere lik frå år til år
-  indikatorliste <- indikatorliste23
-  slim_variables <- slim_variables23
+  indikatorliste_SB <- datapakke_indikatorliste_SB23
+  slim_variables_SB <- datapakke_slim_variables_SB23
   
-  Y1 <- slim_variables(Y1)
-  Y2 <- slim_variables(Y2)
-  Y3 <- slim_variables(Y3)
+  Y1 <- slim_variables_SB(Y1)
+  Y2 <- slim_variables_SB(Y2)
+  Y3 <- slim_variables_SB(Y3)
   
   # Tar bort utdanningar som ikkje finst i nyaste datasett
   Y1_sub <- Y1 %>% filter(Studieprogramkode %in% Y3$Studieprogramkode)
@@ -958,10 +959,10 @@ datapakke_print_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part =
                             "Det er viktig å huske at tallene i Sisteårsundersøkelsen og Studiebarometeret ikke gjelder samme studentkull.\n",
                             "En kan derfor ikke forvente å observere sammenfallende trender i de to undersøkelsene.\n",
                             "Årstall viser til når undersøkelsen ble sendt ut.")
-      forklaring_tid <- paste("Når NOKUT/Rambøll presenterer tidsbruk, tar de med alle svar. OsloMet har hatt en praksis med å filtrere bort svar",
-                              "der summen av tid til organisert læring, egenstudier og arbeid blir under 11 eller over 60 timer per uke.",
-                              "Vi tar her med verdier for begge varianter, og har markert versjonene der vi tar med også svar som gir samlet tidsbruk under 11 og over 60 timer.")
-      forklaring_variabler <- paste("Indeksene er satt sammen av flere spørsmål, man må ha svart på de fleste av spørsmålene om et tema for at svarene skal bli inkludert i indeksen.")
+      forklaring_tid <- paste()#"Når NOKUT/Rambøll presenterer tidsbruk, tar de med alle svar. OsloMet har hatt en praksis med å filtrere bort svar",
+                              # "der summen av tid til organisert læring, egenstudier og arbeid blir under 11 eller over 60 timer per uke.",
+                              # "Vi tar her med verdier for begge varianter, og har markert versjonene der vi tar med også svar som gir samlet tidsbruk under 11 og over 60 timer.")
+      forklaring_variabler <- paste()#"Indeksene er satt sammen av flere spørsmål, man må ha svart på de fleste av spørsmålene om et tema for at svarene skal bli inkludert i indeksen.")
       
       writeData(wb, sn, forklaring, startRow = 2)
       writeData(wb, sn, forklaring_n, startRow = 3)
@@ -987,7 +988,7 @@ datapakke_print_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part =
       utdata <- utdata %>% rownames_to_column(., var="Variabel") 
       
       # Legg til spørsmålstekst
-      utdata <- utdata %>% mutate(Indikator = indikatorliste)
+      utdata <- utdata %>% mutate(Indikator = indikatorliste_SB)
       utdata <- relocate(utdata, Indikator, .after = Variabel)
       utdata <- utdata %>% subset(select = -Variabel)
       
@@ -1018,17 +1019,14 @@ datapakke_print_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part =
       # print(utd_id)
       # Treng ikkje gjere dette viss det ikkje finst sisteårsdata
       if (NROW(sa_utd) > 0) {
-        forklaring_variabler <- paste("Indeksene er satt sammen av flere spørsmål, man må ha svart på de fleste av spørsmålene om et tema for at svarene skal bli inkludert i indeksen.")
-        # paste("Praksisindeksen er satt sammen av disse variablene, man må ha svart på minst tre av dem for at svarene skal bli inkludert i indeksen:\n",
-        #                             "Hvor enig er du i disse påstandene?  [Jeg var godt forberedt til praksisperioden(e)];\n",
-        #                             "Hvor enig er du i disse påstandene?  [Det var godt samarbeid mellom praksisstedet og OsloMet];\n",
-        #                             "Hvor enig er du i disse påstandene?  [Teoriopplæringen var relevant for praksisutøvelsen];\n",
-        #                             "Hvor enig er du i disse påstandene?  [Praksisutøvelsen ble brukt som grunnlag for diskusjon/refleksjon i undervisningen]\n")
-        # 
-        # Summering av snitt, gruppert på år
-        # Det hadde gått an å bruke ein av desse, for å kunne kode Nei=0, Usikker=1, Ja=2:
-        # summarise(mean(flerkulturell_kompetanse == 1, na.rm = T))
-        # summarise(1-mean((flerkulturell_pre == "Ja" | flerkulturell_pre == "Yes"), na.rm = T))
+        forklaring_variabler <- paste()#"Indeksene er satt sammen av flere spørsmål, man må ha svart på de fleste av spørsmålene om et tema for at svarene skal bli inkludert i indeksen.")
+        # 2023-indikatorar, vurder å lage indikatorliste som for SB:
+        # Hvor fornøyd er du med det sosiale miljøet blant studentene?
+        # Hvor fornøyd er du med det faglige miljøet blant studentene?
+        # Hvor fornøyd er du med miljøet mellom undervisere og studenter? 
+        # Det er lett å finne informasjonen jeg trenger i Canvas
+        # Det er godt samsvar mellom informasjon fra undervisere og administrasjon
+        
         sa_utdata <- sa_utd %>% group_by(undersøkelse_år) %>% summarise(
           mean(flerkulturell_kompetanse, na.rm = T), 
           mean(nettbasert_internasjonalt, na.rm = T), 
@@ -1179,17 +1177,8 @@ datapakke_print_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part =
       # sa_utdata <- c()
       # print(utd_id)
       
-      forklaring_variabler <- paste("Indeksene er satt sammen av flere spørsmål, man må ha svart på de fleste av spørsmålene om et tema for at svarene skal bli inkludert i indeksen.")
-      # paste("Praksisindeksen er satt sammen av disse variablene, man må ha svart på minst tre av dem for at svarene skal bli inkludert i indeksen:\n",
-      #                             "Hvor enig er du i disse påstandene?  [Jeg var godt forberedt til praksisperioden(e)];\n",
-      #                             "Hvor enig er du i disse påstandene?  [Det var godt samarbeid mellom praksisstedet og OsloMet];\n",
-      #                             "Hvor enig er du i disse påstandene?  [Teoriopplæringen var relevant for praksisutøvelsen];\n",
-      #                             "Hvor enig er du i disse påstandene?  [Praksisutøvelsen ble brukt som grunnlag for diskusjon/refleksjon i undervisningen]\n")
-      
-      # Summering av snitt, gruppert på år
-      # Det hadde gått an å bruke ein av desse, for å kunne kode Nei=0, Usikker=1, Ja=2:
-      # summarise(mean(flerkulturell_kompetanse == 1, na.rm = T))
-      # summarise(1-mean((flerkulturell_pre == "Ja" | flerkulturell_pre == "Yes"), na.rm = T))
+      forklaring_variabler <- paste()#"Indeksene er satt sammen av flere spørsmål, man må ha svart på de fleste av spørsmålene om et tema for at svarene skal bli inkludert i indeksen.")
+
       sa_utdata <- sa_utd %>% group_by(undersøkelse_år) %>% summarise(
         mean(flerkulturell_kompetanse, na.rm = T), 
         mean(nettbasert_internasjonalt, na.rm = T), 
@@ -1300,7 +1289,7 @@ datapakke_utrad_p <- function(sdf, sisteår, forrigeår) {
 
 # Dupliser og namngi per år for å kunne skilje
 # Select variables helper
-datapakke_slim_variables23 <- function(sdf) {
+datapakke_slim_variables_SB23 <- function(sdf) {
   # Studentenes tilfredshet med undervisning (indeks Studiebarometeret)
   # indx_underv4
   # Studentenes tilfredshet med veiledning (indeks Studiebarometeret)
@@ -1317,11 +1306,11 @@ datapakke_slim_variables23 <- function(sdf) {
                  StudiumID,
                  # studieprogram_instkode, 
                  år,
-                 indx_underv4,
-                 indx_tilbveil4,
-                 indx_forvent4,
-                 indx_digit4,
-                 indx_vurd5
+                 # indx_underv4,
+                 # indx_tilbveil4,
+                 # indx_forvent4,
+                 # indx_digit4,
+                 # indx_vurd5
                  # organ_fagligsam_17,
                  # vurd_fagutv_17,
                  # egeteng_motivert_14,
@@ -1350,12 +1339,22 @@ datapakke_slim_variables23 <- function(sdf) {
 
 # Dupliser og namngi per år for å kunne skilje
 # Må matche variabellista over
-datapakke_indikatorliste23 <- (c(
-  "Studentenes tilfredshet med undervisning (indeks Studiebarometeret)",
-  "Studentenes tilfredshet med veiledning (indeks Studiebarometeret)",
-  "Faglig ansattes forventninger til studentene (indeks Studiebarometeret)",
-  "Bruk av digitale verktøy (indeks Studiebarometeret)",
-  "Studentenes tilfredshet med vurderingsformene (indeks Studiebarometeret)"
+datapakke_indikatorliste_SB23 <- (c(
+  "Lokaler for undervisning og øvrig studentarbeid",
+  "Utstyr og hjelpemidler i undervisningen",
+  "Bibliotek og bibliotekstjenester",
+  "Tilfredshet med det sosiale miljøet blant studentene på studieprogrammet",
+  "Tilfredshet med det faglige miljøet blant studentene på studieprogrammet",
+  "Tilfredshet med miljøet mellom studentene og de faglig ansatte på studieprogrammet",
+  "Tilfredshet med tilgjengelighet på informasjon om studieprogrammet",
+  "Tilfredshet med kvaliteten på informasjonen om studieprogrammet",
+  "Tilfredshet med den administrative tilretteleggingen av studieprogrammet (timeplan, studieplan etc)",
+  "Studentene har mulighet for å gi innspill på innhold og opplegg i studieprogrammet"
+  # "Studentenes tilfredshet med undervisning (indeks Studiebarometeret)",
+  # "Studentenes tilfredshet med veiledning (indeks Studiebarometeret)",
+  # "Faglig ansattes forventninger til studentene (indeks Studiebarometeret)",
+  # "Bruk av digitale verktøy (indeks Studiebarometeret)",
+  # "Studentenes tilfredshet med vurderingsformene (indeks Studiebarometeret)",
   # "Den faglige sammenhengen mellom emnene i studieprogrammet",
   # "Om eksamener, innleveringer og andre vurderingsformer hittil i studieprogrammet ditt har bidratt til faglig utvikling",
   # "Jeg er motivert for studieinnsats",
@@ -1410,14 +1409,14 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
     }
   }
   
-  # ved å sette vektoren indikatorliste og funksjonen slim_variables til år-spesifikke versjonar,
+  # ved å sette vektoren indikatorliste_SB og funksjonen datapakke_slim_variables_SB til år-spesifikke versjonar,
   # kan resten av koden vere lik frå år til år
-  indikatorliste <- indikatorliste23
-  slim_variables <- slim_variables23
+  indikatorliste_SB <- datapakke_indikatorliste_SB23
+  slim_variables_SB <- datapakke_slim_variables_SB23
   
-  Y1 <- slim_variables(Y1)
-  Y2 <- slim_variables(Y2)
-  Y3 <- slim_variables(Y3)
+  Y1 <- slim_variables_SB(Y1)
+  Y2 <- slim_variables_SB(Y2)
+  Y3 <- slim_variables_SB(Y3)
   # # Tidsvariablar må justerast, slik at deltid ikkje blir tatt med
   # Y1$tid_orgstudier[Y1$heltid < 1] <- NA
   # Y2$tid_orgstudier[Y2$heltid < 1] <- NA
@@ -1467,15 +1466,11 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
                         "Det er viktig å huske at tallene i Sisteårsundersøkelsen og Studiebarometeret ikke gjelder samme studentkull.\n",
                         "En kan derfor ikke forvente å observere sammenfallende trender i de to undersøkelsene.\n",
                         "Årstall viser til når undersøkelsen ble sendt ut.")
-  forklaring_tid <- paste("Når NOKUT/Rambøll presenterer tidsbruk, tar de med alle svar. OsloMet har hatt en praksis med å filtrere bort svar",
-                          "der summen av tid til organisert læring, egenstudier og arbeid blir under 11 eller over 60 timer per uke.",
-                          "Vi tar her med verdier for begge varianter, og har markert versjonene der vi tar med også svar som gir samlet tidsbruk under 11 og over 60 timer.")
-  forklaring_variabler <- paste("Indeksene er satt sammen av flere spørsmål, man må ha svart på de fleste av spørsmålene om et tema for at svarene skal bli inkludert i indeksen.")
-  # paste("Praksisindeksen er satt sammen av disse variablene, man må ha svart på minst tre av dem for at svarene skal bli inkludert i indeksen:\n",
-  #                             "Hvor enig er du i disse påstandene?  [Jeg var godt forberedt til praksisperioden(e)];\n",
-  #                             "Hvor enig er du i disse påstandene?  [Det var godt samarbeid mellom praksisstedet og OsloMet];\n",
-  #                             "Hvor enig er du i disse påstandene?  [Teoriopplæringen var relevant for praksisutøvelsen];\n",
-  #                             "Hvor enig er du i disse påstandene?  [Praksisutøvelsen ble brukt som grunnlag for diskusjon/refleksjon i undervisningen]\n")
+  forklaring_tid <- paste()#"Når NOKUT/Rambøll presenterer tidsbruk, tar de med alle svar. OsloMet har hatt en praksis med å filtrere bort svar",
+                          # "der summen av tid til organisert læring, egenstudier og arbeid blir under 11 eller over 60 timer per uke.",
+                          # "Vi tar her med verdier for begge varianter, og har markert versjonene der vi tar med også svar som gir samlet tidsbruk under 11 og over 60 timer.")
+  forklaring_variabler <- paste()#"Indeksene er satt sammen av flere spørsmål, man må ha svart på de fleste av spørsmålene om et tema for at svarene skal bli inkludert i indeksen.")
+  
   # OsloMet-fane
   addWorksheet(wb, "OsloMet")
   # Snitt
@@ -1488,7 +1483,7 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
     data.frame(., row.names = 1) %>% t %>% as.data.frame() %>% rownames_to_column(., var="Variabel")
   
   # Legg til spørsmålstekst
-  utdata <- utdata %>% mutate(Indikator = indikatorliste)
+  utdata <- utdata %>% mutate(Indikator = indikatorliste_SB)
   utdata <- relocate(utdata, Indikator, .after = Variabel)
   utdata <- utdata %>% subset(select = -Variabel)
   
@@ -1496,6 +1491,12 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
   utdata_n <- utdata_n %>% rename_with(~paste("N", .x))
   
   # Lag tabell for spørsmål frå Sisteårsstudenten
+  # 2023-indikatorar, vurder å lage indikatorliste som for SB:
+  # Hvor fornøyd er du med det sosiale miljøet blant studentene?
+  # Hvor fornøyd er du med det faglige miljøet blant studentene?
+  # Hvor fornøyd er du med miljøet mellom undervisere og studenter? 
+  # Det er lett å finne informasjonen jeg trenger i Canvas
+  # Det er godt samsvar mellom informasjon fra undervisere og administrasjon
   # Snitt
   sa_utdata <- SA_tidsserie %>% group_by(år) %>% 
     summarise(
@@ -1521,7 +1522,6 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
   # TODO sjekk om desse kan oppdaterast til same kode som for fakultetsutskrift, 
   # for å gjere dei meir robuste. Omnamninga er kanskje gjort betre her.
   # søk etter utdata_år$år <- paste("N", utdata_år$år)
-  
   
   # Legg til spørsmålstekst
   # print(sa_utd[1,]$programkode)
@@ -1625,7 +1625,7 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
       data.frame(., row.names = 1) %>% t %>% as.data.frame() %>% rownames_to_column(., var="Variabel")
     
     # Legg til spørsmålstekst
-    utdata <- utdata %>% mutate(Indikator = indikatorliste)
+    utdata <- utdata %>% mutate(Indikator = indikatorliste_SB)
     utdata <- relocate(utdata, Indikator, .after = Variabel)
     utdata <- utdata %>% subset(select = -Variabel)
     
