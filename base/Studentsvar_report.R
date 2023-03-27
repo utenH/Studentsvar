@@ -890,14 +890,14 @@ datapakke_print_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part =
   # Del opp datasett, eldst til nyast
   # bruk SB_tidsserie[[x]] for å velje
   # OBS oppdatere årstal
-  Y1 <- SB_tidsserie[[1]] %>% mutate(år = "2019")
-  Y2 <- SB_tidsserie[[2]] %>% mutate(år = "2020")
-  Y3 <- SB_tidsserie[[3]] %>% mutate(år = "2021")
+  Y1 <- SB_tidsserie[[1]] %>% mutate(år = "2020")
+  Y2 <- SB_tidsserie[[2]] %>% mutate(år = "2021")
+  Y3 <- SB_tidsserie[[3]] %>% mutate(år = "2022")
   
   # ved å sette vektoren indikatorliste og funksjonen slim_variables til år-spesifikke versjonar,
   # kan resten av koden vere lik frå år til år
-  indikatorliste <- indikatorliste22
-  slim_variables <- slim_variables22
+  indikatorliste <- indikatorliste23
+  slim_variables <- slim_variables23
   
   Y1 <- slim_variables(Y1)
   Y2 <- slim_variables(Y2)
@@ -908,7 +908,7 @@ datapakke_print_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part =
   Y2_sub <- Y2 %>% filter(Studieprogramkode %in% Y3$Studieprogramkode)
   
   # Slå saman datasett
-  ys <- rbind(Y1_sub, Y2_sub, Y3)
+  ys <- bind_rows(Y1_sub, Y2_sub, Y3)
   
   # Grupper på fakultet
   ys_fak <- ys %>% group_by(fakultet) %>% group_split()
@@ -1300,7 +1300,7 @@ datapakke_utrad_p <- function(sdf, sisteår, forrigeår) {
 
 # Dupliser og namngi per år for å kunne skilje
 # Select variables helper
-datapakke_slim_variables22 <- function(sdf) {
+datapakke_slim_variables23 <- function(sdf) {
   # Studentenes tilfredshet med undervisning (indeks Studiebarometeret)
   # indx_underv4
   # Studentenes tilfredshet med veiledning (indeks Studiebarometeret)
@@ -1350,7 +1350,7 @@ datapakke_slim_variables22 <- function(sdf) {
 
 # Dupliser og namngi per år for å kunne skilje
 # Må matche variabellista over
-datapakke_indikatorliste22 <- (c(
+datapakke_indikatorliste23 <- (c(
   "Studentenes tilfredshet med undervisning (indeks Studiebarometeret)",
   "Studentenes tilfredshet med veiledning (indeks Studiebarometeret)",
   "Faglig ansattes forventninger til studentene (indeks Studiebarometeret)",
@@ -1390,9 +1390,9 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
   # Del opp datasett, eldst til nyast, sett inn årstal
   # bruk SB_tidsserie[[x]] for å velje
   # OBS oppdatere årstal
-  Y1 <- SB_tidsserie[[1]] %>% mutate(år = "2019")
-  Y2 <- SB_tidsserie[[2]] %>% mutate(år = "2020")
-  Y3 <- SB_tidsserie[[3]] %>% mutate(år = "2021")
+  Y1 <- SB_tidsserie[[1]] %>% mutate(år = "2020")
+  Y2 <- SB_tidsserie[[2]] %>% mutate(år = "2021")
+  Y3 <- SB_tidsserie[[3]] %>% mutate(år = "2022")
   
   if (nivå != "") {
     Y1 <- Y1 %>% filter(master == nivå)
@@ -1412,8 +1412,8 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
   
   # ved å sette vektoren indikatorliste og funksjonen slim_variables til år-spesifikke versjonar,
   # kan resten av koden vere lik frå år til år
-  indikatorliste <- indikatorliste22
-  slim_variables <- slim_variables22
+  indikatorliste <- indikatorliste23
+  slim_variables <- slim_variables23
   
   Y1 <- slim_variables(Y1)
   Y2 <- slim_variables(Y2)
@@ -1440,7 +1440,7 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
   # Y3$tidsbruk_egeninns_14[Y3$heltid < 1] <- NA
   
   # Slå saman datasett
-  ys <- rbind(Y1, Y2, Y3)
+  ys <- bind_rows(Y1, Y2, Y3)
   
   # Grupper på fakultet
   ys_fak <- ys %>% group_by(fakultet) %>% group_split()
@@ -1860,8 +1860,8 @@ SB_fritekst_analyse_xlsx <- function(sdf) {
     n_fak <- sdf %>% filter(!is.na(fritekst_studprog)) %>% group_by(FAKNAVN) %>% summarise(N = n()) %>% 
       rename(Nivå = FAKNAVN)
     
-    n <- rbind(n_OM, n_fak)
-    prop_tema_studprog <- rbind(prop_studprog_OM, prop_studprog_fak)
+    n <- bind_rows(n_OM, n_fak)
+    prop_tema_studprog <- bind_rows(prop_studprog_OM, prop_studprog_fak)
     prop_tema_studprog <- cbind(prop_tema_studprog, n["N"]) %>% relocate(N, .after = 1)
     # print(prop_tema_studprog)
     
