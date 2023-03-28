@@ -889,16 +889,21 @@ datapakke_print_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part =
   
   # Del opp datasett, eldst til nyast
   # bruk SB_tidsserie[[x]] for å velje
-  # OBS oppdatere årstal
   # TODO 2023 - handtere fleire årstal enn tre
-  Y1 <- SB_tidsserie[[1]] %>% mutate(år = "2020")
-  Y2 <- SB_tidsserie[[2]] %>% mutate(år = "2021")
-  Y3 <- SB_tidsserie[[3]] %>% mutate(år = "2022")
+  
+  # I 2023-koda blir årstal satt ved import frå Excel, alle referansar til `år` må bli `undersøkelse_år`
+  # OBS oppdatere årstal
+  # Y1 <- SB_tidsserie[[1]] %>% mutate(år = "2020")
+  # Y2 <- SB_tidsserie[[2]] %>% mutate(år = "2021")
+  # Y3 <- SB_tidsserie[[3]] %>% mutate(år = "2022")
   
   # ved å sette vektoren indikatorliste_SB og funksjonen slim_variables_SB til år-spesifikke versjonar,
-  # kan resten av koden vere lik frå år til år
+  # kan resten av koden vere lik frå år til år, tilsvarande for Sisteårs
   indikatorliste_SB <- datapakke_indikatorliste_SB23
   slim_variables_SB <- datapakke_slim_variables_SB23
+  
+  indikatorliste_SA <- datapakke_indikatorliste_SA23
+  slim_variables_SA <- datapakke_slim_variables_SA23
   
   Y1 <- slim_variables_SB(Y1)
   Y2 <- slim_variables_SB(Y2)
@@ -972,16 +977,12 @@ datapakke_print_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part =
       ##**
       ##* Lag tabell for spørsmål frå Studiebarometeret
       ##* 
-      # Snitt
       # Summering av snitt, gruppert på år
-      # utdata <- utd %>% group_by(år) %>% summarise(across(4:26, ~mean(., na.rm = T))) 
-      # print(utd)
-      # break()
-      utdata <- utd %>% group_by(år) %>% summarise(across(4:(ncol(utd)-1), ~mean(., na.rm = T))) 
+      utdata <- utd %>% group_by(undersøkelse_år) %>% summarise(across(4:(ncol(utd)-1), ~mean(., na.rm = T))) 
       # mellomlagre kolonne med årstal, for å kunne transformere tabell så variablane kjem som rader
       utdata_år <- utdata %>% select(1)
       # fjerner årstalkolonne og transformerer tabellen til vertikalt format
-      utdata <- utdata %>% subset(select= -1) %>% t %>% as.data.frame() 
+      utdata <- utdata %>% subset(select = -1) %>% t %>% as.data.frame() 
       # namngir årstalkolonner med årstal
       colnames(utdata) <- utdata_år[["undersøkelse_år"]]
       # gjer om radnamn til namngitt kolonne, for vidare behandling
@@ -993,16 +994,15 @@ datapakke_print_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part =
       utdata <- utdata %>% subset(select = -Variabel)
       
       # N gruppert på år
-      # utdata_n <- utd %>% group_by(år) %>% summarise(across(4:26, ~sum(!is.na(.) )))
-      utdata_n <- utd %>% group_by(år) %>% summarise(across(4:(ncol(utd)-1), ~sum(!is.na(.) )))
+      utdata_n <- utd %>% group_by(undersøkelse_år) %>% summarise(across(4:(ncol(utd)-1), ~sum(!is.na(.) )))
       # mellomlagre kolonne med årstal, for å kunne transformere tabell så variablane kjem som rader
       # Legg til "N" før årstal for å kunne slå saman til ein tabell
-      utdata_år <- utdata_n %>% select(1)
-      utdata_år$undersøkelse_år <- paste("N", utdata_år$undersøkelse_år)
+      sb_utdata_år <- utdata_n %>% select(1)
+      sb_utdata_år$undersøkelse_år <- paste("N", sb_utdata_år$undersøkelse_år)
       # fjerner årstalkolonne og transformerer tabellen til vertikalt format
       utdata_n <- utdata_n %>% subset(select= -1) %>% t %>% as.data.frame() 
       # namngir årstalkolonner med årstal
-      colnames(utdata_n) <- utdata_år[["undersøkelse_år"]]
+      colnames(utdata_n) <- sb_utdata_år[["undersøkelse_år"]]
       # tar bort variabelkolonne, den trengst ikkje i utskrift
       rownames(utdata_n) <- NULL
       
@@ -1020,19 +1020,12 @@ datapakke_print_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part =
       # Treng ikkje gjere dette viss det ikkje finst sisteårsdata
       if (NROW(sa_utd) > 0) {
         forklaring_variabler <- paste()#"Indeksene er satt sammen av flere spørsmål, man må ha svart på de fleste av spørsmålene om et tema for at svarene skal bli inkludert i indeksen.")
-        # 2023-indikatorar, vurder å lage indikatorliste som for SB:
-        # Hvor fornøyd er du med det sosiale miljøet blant studentene?
-        # Hvor fornøyd er du med det faglige miljøet blant studentene?
-        # Hvor fornøyd er du med miljøet mellom undervisere og studenter? 
-        # Det er lett å finne informasjonen jeg trenger i Canvas
-        # Det er godt samsvar mellom informasjon fra undervisere og administrasjon
         
-        sa_utdata <- sa_utd %>% group_by(undersøkelse_år) %>% summarise(
-          mean(flerkulturell_kompetanse, na.rm = T), 
-          mean(nettbasert_internasjonalt, na.rm = T), 
-          mean(indx_praksis4, na.rm = T))
-        # mean(nyttigeemner, na.rm = T), 
-        #   mean(godtlub, na.rm = T))
+        ##* Lag tabell for spørsmål frå Sisteårsundersøkinga
+        ##* TODO: gjere dette i aggregert-funksjon
+        ##* 
+        # Summering av snitt, gruppert på år
+        sa_utdata <- sa_utd %>% group_by(undersøkelse_år) %>% summarise(across(4:(ncol(utd)-1), ~mean(., na.rm = T))) 
         # mellomlagre kolonne med årstal, for å kunne transformere tabell så variablane kjem som rader
         sa_utdata_år <- sa_utdata %>% select(1)
         # fjerner årstalkolonne og transformerer tabellen til vertikalt format
@@ -1043,40 +1036,22 @@ datapakke_print_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part =
         sa_utdata <- sa_utdata %>% rownames_to_column(., var="Variabel")
         
         # Legg til spørsmålstekst
-        sa_utdata <- 
-          sa_utdata %>% mutate(Indikator = 
-                                 c("Studentenes opplevelse av læring som gir internasjonal og flerkulturell kompetanse (Andel svart ja)",
-                                   "Studentenes deltagelse i nettbaserte grupper med studenter fra andre land (Sisteårsstudenten, kun stilt i 2022)",
-                                   "Studentenes tilfredshet med praksisstudiene (indeks Sisteårsstudenten)")) 
-        # c("Har alle emnene i studieprogrammet ditt vært nyttige (andel Ja)",
-        #    "Jeg er godt fornøyd med læringsutbyttet jeg har hatt på studieprogrammet"))
-        
+        sa_utdata <- sa_utdata %>% mutate(Indikator = indikatorliste_SA)
         sa_utdata <- relocate(sa_utdata, Indikator, .after = Variabel)
         sa_utdata <- sa_utdata %>% subset(select = -Variabel)
         # Gjer om til NA, for å rydde bort #NUM! i excelfila
         sa_utdata[sa_utdata == "NaN"] <- NA
         
-        # sa_utdata <- sa_utd %>% group_by(år) %>% 
-        #   summarise(
-        #       mean(nyttigeemner, na.rm = T), 
-        #       mean(godtlub, na.rm = T)) %>% 
-        #   data.frame(., row.names = 1) %>% t %>% as.data.frame() %>% rownames_to_column(., var="Variabel")
-        
         # N gruppert på år
-        sa_utdata_n <- sa_utd %>% group_by(år) %>% summarise(
-          sum(!is.na(flerkulturell_kompetanse)), 
-          sum(!is.na(nettbasert_internasjonalt)),
-          sum(!is.na(indx_praksis4)))
-        # sum(!is.na(nyttigeemner)), 
-        #   sum(!is.na(godtlub)))
+        sa_utdata_n <- sa_utd %>% group_by(undersøkelse_år) %>% summarise(across(4:(ncol(utd)-1), ~sum(!is.na(.) )))
         # mellomlagre kolonne med årstal, for å kunne transformere tabell så variablane kjem som rader
         # Legg til "N" før årstal for å kunne slå saman til ein tabell
-        utdata_år <- sa_utdata_n %>% select(1)
-        utdata_år$undersøkelse_år <- paste("N", utdata_år$undersøkelse_år)
+        sa_utdata_år <- sa_utdata_n %>% select(1)
+        sa_utdata_år$undersøkelse_år <- paste("N", sa_utdata_år$undersøkelse_år)
         # fjerner årstalkolonne og transformerer tabellen til vertikalt format
         sa_utdata_n <- sa_utdata_n %>% subset(select= -1) %>% t %>% as.data.frame() 
         # namngir årstalkolonner med årstal
-        colnames(sa_utdata_n) <- utdata_år[["undersøkelse_år"]]
+        colnames(sa_utdata_n) <- sa_utdata_år[["undersøkelse_år"]]
         # tar bort variabelkolonne, den trengst ikkje i utskrift
         rownames(sa_utdata_n) <- NULL
         
@@ -1287,20 +1262,8 @@ datapakke_utrad_p <- function(sdf, sisteår, forrigeår) {
   return(df_p)
 }
 
-# Dupliser og namngi per år for å kunne skilje
 # Select variables helper
 datapakke_slim_variables_SB23 <- function(sdf) {
-  # Studentenes tilfredshet med undervisning (indeks Studiebarometeret)
-  # indx_underv4
-  # Studentenes tilfredshet med veiledning (indeks Studiebarometeret)
-  # indx_tilbveil4
-  # Faglig ansattes forventninger til studentene (indeks Studiebarometeret)
-  # indx_forvent4
-  # Bruk av digitale verktøy (indeks Studiebarometeret)
-  # indx_digit4
-  # Studentenes tilfredshet med vurderingsformene (indeks Studiebarometeret)
-  # indx_vurd5
-  
   sdf %>% select(fakultet, 
                  Studieprogramkode, 
                  StudiumID,
@@ -1337,9 +1300,8 @@ datapakke_slim_variables_SB23 <- function(sdf) {
   )
 }
 
-# Dupliser og namngi per år for å kunne skilje
 # Må matche variabellista over
-datapakke_indikatorliste_SB23 <- (c(
+datapakke_indikatorliste_SB23 <- c(
   "Lokaler for undervisning og øvrig studentarbeid",
   "Utstyr og hjelpemidler i undervisningen",
   "Bibliotek og bibliotekstjenester",
@@ -1378,7 +1340,26 @@ datapakke_indikatorliste_SB23 <- (c(
   # "LUB - Evne til å arbeide selvstendig",
   # "Timetall - Læringsaktiviteter organisert av institusjonen (med ekstremverdier)",
   # "Timetall - Egenstudier (med ekstremverdier)"
-))
+)
+
+# Select variables helper
+datapakke_slim_variables_SA23 <- function(sdf) {
+  sdf %>% select(fakultet, 
+                 Studieprogramkode, 
+                 StudiumID,
+                 år,
+                 
+  )
+}
+
+# Må matche variabellista over
+datapakke_indikatorliste_SA23 <- c(
+  "Hvor fornøyd er du med det sosiale miljøet blant studentene?",
+  "Hvor fornøyd er du med det faglige miljøet blant studentene?",
+  "Hvor fornøyd er du med miljøet mellom undervisere og studenter?",
+  "Det er lett å finne informasjonen jeg trenger i Canvas",
+  "Det er godt samsvar mellom informasjon fra undervisere og administrasjon"
+)
 
 # TODO: etterlign oppsett på programnivå
 # Eksportere datapakke til fakultetsrapport - OsloMet-tal og per fakultet
@@ -1388,10 +1369,11 @@ datapakke_indikatorliste_SB23 <- (c(
 datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part = "", nivå = "") {
   # Del opp datasett, eldst til nyast, sett inn årstal
   # bruk SB_tidsserie[[x]] for å velje
-  # OBS oppdatere årstal
-  Y1 <- SB_tidsserie[[1]] %>% mutate(år = "2020")
-  Y2 <- SB_tidsserie[[2]] %>% mutate(år = "2021")
-  Y3 <- SB_tidsserie[[3]] %>% mutate(år = "2022")
+  # # OBS oppdatere årstal
+  # I 2023-koda blir årstal satt ved import frå Excel, alle referansar til `år` må bli `undersøkelse_år`
+  # Y1 <- SB_tidsserie[[1]] %>% mutate(år = "2020")
+  # Y2 <- SB_tidsserie[[2]] %>% mutate(år = "2021")
+  # Y3 <- SB_tidsserie[[3]] %>% mutate(år = "2022")
   
   if (nivå != "") {
     Y1 <- Y1 %>% filter(master == nivå)
@@ -1475,11 +1457,11 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
   addWorksheet(wb, "OsloMet")
   # Snitt
   # utdata <- ys %>% group_by(år) %>% summarise(across(4:26, ~mean(., na.rm = T))) %>%
-  utdata <- ys %>% group_by(år) %>% summarise(across(4:(ncol(ys)-1), ~mean(., na.rm = T))) %>%
+  utdata <- ys %>% group_by(undersøkelse_år) %>% summarise(across(4:(ncol(ys)-1), ~mean(., na.rm = T))) %>%
     data.frame(., row.names = 1) %>% t %>% as.data.frame() %>% rownames_to_column(., var="Variabel")
   # N
   # utdata_n <- ys %>% group_by(år) %>% summarise(across(4:26, ~sum(!is.na(.) )))%>% 
-  utdata_n <- ys %>% group_by(år) %>% summarise(across(4:(ncol(ys)-1), ~sum(!is.na(.) )))%>% 
+  utdata_n <- ys %>% group_by(undersøkelse_år) %>% summarise(across(4:(ncol(ys)-1), ~sum(!is.na(.) )))%>% 
     data.frame(., row.names = 1) %>% t %>% as.data.frame() %>% rownames_to_column(., var="Variabel")
   
   # Legg til spørsmålstekst
@@ -1498,7 +1480,7 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
   # Det er lett å finne informasjonen jeg trenger i Canvas
   # Det er godt samsvar mellom informasjon fra undervisere og administrasjon
   # Snitt
-  sa_utdata <- SA_tidsserie %>% group_by(år) %>% 
+  sa_utdata <- SA_tidsserie %>% group_by(undersøkelse_år) %>% 
     summarise(
       mean(flerkulturell_kompetanse, na.rm = T), 
       mean(nettbasert_internasjonalt, na.rm = T), 
@@ -1511,7 +1493,7 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
   sa_utdata[sa_utdata == "NaN"] <- NA
   
   # N
-  sa_utdata_n <- SA_tidsserie %>% group_by(år) %>% 
+  sa_utdata_n <- SA_tidsserie %>% group_by(undersøkelse_år) %>% 
     summarise(
       sum(!is.na(flerkulturell_kompetanse)), 
       sum(!is.na(nettbasert_internasjonalt)), 
@@ -1521,7 +1503,6 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
     data.frame(., row.names = 1) %>% t %>% as.data.frame() %>% rownames_to_column(., var="Variabel")
   # TODO sjekk om desse kan oppdaterast til same kode som for fakultetsutskrift, 
   # for å gjere dei meir robuste. Omnamninga er kanskje gjort betre her.
-  # søk etter utdata_år$år <- paste("N", utdata_år$år)
   
   # Legg til spørsmålstekst
   # print(sa_utd[1,]$programkode)
@@ -1616,12 +1597,12 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
     
     # Snitt
     # utdata <- fak %>% group_by(år) %>% summarise(across(4:26, ~mean(., na.rm = T))) %>% 
-    utdata <- fak %>% group_by(år) %>% summarise(across(4:(ncol(fak)-1), ~mean(., na.rm = T))) %>% 
+    utdata <- fak %>% group_by(undersøkelse_år) %>% summarise(across(4:(ncol(fak)-1), ~mean(., na.rm = T))) %>% 
       data.frame(., row.names = 1) %>% t %>% as.data.frame() %>% rownames_to_column(., var="Variabel")
     
     # N
     # utdata_n <- fak %>% group_by(år) %>% summarise(across(4:26, ~sum(!is.na(.) )) ) %>% 
-    utdata_n <- fak %>% group_by(år) %>% summarise(across(4:(ncol(fak)-1), ~sum(!is.na(.) )) ) %>% 
+    utdata_n <- fak %>% group_by(undersøkelse_år) %>% summarise(across(4:(ncol(fak)-1), ~sum(!is.na(.) )) ) %>% 
       data.frame(., row.names = 1) %>% t %>% as.data.frame() %>% rownames_to_column(., var="Variabel")
     
     # Legg til spørsmålstekst
@@ -1637,7 +1618,7 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
     sa_f <- SA_tidsserie %>% filter(fakultet == fak_n)
     
     # Snitt
-    sa_utdata <- sa_f %>% group_by(år) %>% 
+    sa_utdata <- sa_f %>% group_by(undersøkelse_år) %>% 
       summarise(
         mean(flerkulturell_kompetanse, na.rm = T), 
         mean(nettbasert_internasjonalt, na.rm = T), 
@@ -1658,12 +1639,7 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
     
     # Legg til spørsmålstekst
     sa_utdata <- 
-      sa_utdata %>% mutate(Indikator = 
-                             c("Studentenes opplevelse av læring som gir internasjonal og flerkulturell kompetanse (Andel svart ja)",
-                               "Studentenes deltagelse i nettbaserte grupper med studenter fra andre land (Sisteårsstudenten, kun stilt i 2022)",
-                               "Studentenes tilfredshet med praksisstudiene (indeks Sisteårsstudenten, ev. praksisevaluering)")) 
-    # c("Har alle emnene i studieprogrammet ditt vært nyttige (andel Ja)",
-    #   "Jeg er godt fornøyd med læringsutbyttet jeg har hatt på studieprogrammet"))
+      sa_utdata %>% mutate(Indikator = indikatorliste_SA)
     
     # Legg til spørsmålstekst, tar bort variabelnamn
     sa_utdata <- relocate(sa_utdata, Indikator, .after = Variabel)

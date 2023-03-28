@@ -80,7 +80,7 @@ SB_unntak <- function(sdf) {
 ##* Funksjon for førebuing av dataframes, Sisteårs 
 ##* Skulle gjerne hatt felles, men viktigare med felles utskriftsfunksjon
 ##* 
-SA_prepare_2022 <- function(innfil, dataår, instnr) {
+SA_prepare_2023 <- function(innfil, dataår, instnr) {
   OM <- read_excel(innfil, .name_repair = janitor::make_clean_names)
   colnames(OM) <- gsub(pattern = "-", replacement = "", x = colnames(OM))
   OM <- OM %>% mutate(undersøkelse_år = dataår)
@@ -89,7 +89,7 @@ SA_prepare_2022 <- function(innfil, dataår, instnr) {
   OM <- SA_tilpassdata(OM)
   OM <- SA_prep_indeks(OM)
   # TODO dette er lat hack, finn betre måte, f.eks. ta med instnr frå DBH
-  OM <- OM %>% mutate(instnr = 1175) 
+  OM <- OM %>% mutate(instnr = instnr) 
   return(OM)
 } 
 
