@@ -904,20 +904,20 @@ datapakke_print_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part =
   SB_tidsserie <- SB_tidsserie %>% lapply(slim_variables_SB)
   SA_tidsserie <- SA_tidsserie %>% lapply(slim_variables_SA)
   
-  # Slå saman datasett TODO: `ys` kan bytte namne til SB_tidsserie
-  ys <- bind_rows(SB_tidsserie)
+  # Slå saman datasett
+  SB_tidsserie <- bind_rows(SB_tidsserie)
   SA_tidsserie <- bind_rows(SA_tidsserie)
 
   # Tar bort utdanningar som ikkje finst i nyaste datasett
   # mellomlagre siste år
-  nyaste <- ys %>% select(undersøkelse_år) %>% max
-  ys <- ys %>% group_by(Studieprogramkode) %>% filter(any(nyaste %in% undersøkelse_år)) %>% ungroup
+  nyaste <- SB_tidsserie %>% select(undersøkelse_år) %>% max
+  SB_tidsserie <- SB_tidsserie %>% group_by(Studieprogramkode) %>% filter(any(nyaste %in% undersøkelse_år)) %>% ungroup
   
   # Grupper på fakultet
-  ys_fak <- ys %>% group_by(fakultet) %>% group_split()
+  SB_tidsserie_fak <- SB_tidsserie %>% group_by(fakultet) %>% group_split()
   
   # for (fak in Y3$fakultet %>% unique %>% sort) {
-  for (fak in ys_fak) {
+  for (fak in SB_tidsserie_fak) {
     fak_n <- fak[1,]$fakultet
     path <- "Rapportfiler/Kvalitetsrapport datapakkar/"
     nameroot <- "datapakke 2023"
@@ -1109,7 +1109,7 @@ datapakke_print_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part =
     }
     
     # Lagar dataframe med resultat frå Sisteårs som _ikkje_ er med i Studiebarometeret
-    SA_not_in_SB <- SA_tidsserie %>% filter(Studieprogramkode %!in% (ys$Studieprogramkode))
+    SA_not_in_SB <- SA_tidsserie %>% filter(Studieprogramkode %!in% (SB_tidsserie$Studieprogramkode))
     SA_not_in_SB <- SA_not_in_SB %>% filter(fakultet == fak_n)
     
     # Hente Studieprogramnavn frå DBH
