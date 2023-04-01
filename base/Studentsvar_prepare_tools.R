@@ -86,6 +86,7 @@ SA_prepare_2023 <- function(innfil, dataår, instnr) {
   OM <- OM %>% mutate(undersøkelse_år = dataår)
   OM[OM==9999] <- NaN # skiljer mellom ikkje-svar (NA) og Vet ikke (NaN)
   OM <- dbh_add_programdata(OM, "fs_kode", instnr)
+  OM <- OM_add_programdata(OM, "Studieprogramkode")
   OM <- SA_tilpassdata(OM)
   OM <- SA_prep_indeks(OM)
   # TODO dette er lat hack, finn betre måte, f.eks. ta med instnr frå DBH
