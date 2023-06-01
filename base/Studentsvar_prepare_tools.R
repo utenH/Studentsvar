@@ -1312,7 +1312,7 @@ SB_name_fak_kort <- function(sdf) {
 }
 
 ##** 
-##* Omkoding Sisteårs
+##* Generiske funksjonar for omkoding av variablar
 ##* 
 
 # Kodar om til faktor for å sikre at alle nivå blir med i utskrift
@@ -1337,7 +1337,6 @@ OM_set_faktor_studerer_niva <- function(sdf, variabel) {
 ##*  Usikker = NaN
 ##*  sdf = dataframe
 ##*  svar = variabelen som skal tolkast
-##*  nyvar = variabelen som blir laga
 OM_janei_bin <- function(sdf, svar) {
   if (!(deparse(substitute(svar)) %in% colnames(sdf))) {
     sdf <- sdf %>% mutate({{svar}} := NaN)
@@ -1376,6 +1375,9 @@ OM_janei_bin_nyvar <- function(sdf, nyvar, svar) {
   ))
 }
 
+##** 
+##* Kodar om frå tekst til faktor basert på variablar som inneheld tal
+##* 
 OM_text_to_factor <- function(sdf, innvariabel, utvariabel, nivå = NULL) {
   sdf <- sdf %>% mutate({{utvariabel}} := case_when(
     grepl("1", {{innvariabel}}) ~ 1,
@@ -1392,6 +1394,40 @@ OM_text_to_factor <- function(sdf, innvariabel, utvariabel, nivå = NULL) {
   }
   return(sdf)
 }
+
+##**
+##* Til å lage binær variabel for dei to beste svaralternativa. 
+##* Fungerer med across, t.d.:
+##* mutate(across(contains("lub_"), OM_svart_fire_eller_fem_bin, .names = "{.col}_topp"))
+##* 
+OM_svart_fire_eller_fem_bin <- function(innvariabel) {
+  case_when(
+    grepl("1", {{innvariabel}}) ~ 0,
+    grepl("2", {{innvariabel}}) ~ 0,
+    grepl("3", {{innvariabel}}) ~ 0,
+    grepl("4", {{innvariabel}}) ~ 1,
+    grepl("5", {{innvariabel}}) ~ 1,
+    {{innvariabel}} != "" ~ NaN
+  )
+}
+##**
+##* Til å lage binær variabel for dei to beste svaralternativa. 
+##*
+# OM_svart_fire_eller_fem_bin <- function(sdf, innvariabel, utvariabel) {
+#   sdf <- sdf %>% mutate({{utvariabel}} := case_when(
+#     grepl("1", {{innvariabel}}) ~ 0,
+#     grepl("2", {{innvariabel}}) ~ 0,
+#     grepl("3", {{innvariabel}}) ~ 0,
+#     grepl("4", {{innvariabel}}) ~ 1,
+#     grepl("5", {{innvariabel}}) ~ 1,
+#     {{innvariabel}} != "" ~ NaN
+#   ))
+#   return(sdf)
+# }
+
+##** 
+##* Omkoding Sisteårs
+##* 
 
 # Kodar om frå tekst-"ordinal" til tal-nivå
 SA_text_to_numerallevels <- function(sdf, originalvar) {
