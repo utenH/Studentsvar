@@ -130,6 +130,12 @@ SA_tilpassdata <- function(sdf) {
   #"Ja, alle emnene har vært nyttige" versus  "Nei, minst ett emne har vært mindre nyttig"	
   sdf <- OM_janei_bin(sdf, har_alle_emnene_i_studieprogrammet_ditt_vaert_nyttige)
   
+  #Svaralternativer: "1 = Ikke enig" - 5 = "Helt enig"
+  sdf <- SA_text_to_numerallevels(sdf, hvor_enig_er_du_i_disse_pastandene_det_er_god_luft_og_temperatur_i_undervisningsrommene)
+  sdf <- SA_text_to_numerallevels(sdf, hvor_enig_er_du_i_disse_pastandene_jeg_og_mine_medstudenter_finner_et_egnet_sted_a_vaere_nar_vi_skal_jobbe_sammen_i_gruppe)
+  sdf <- SA_text_to_numerallevels(sdf, hvor_enig_er_du_i_disse_pastandene_jeg_finner_lesesalsplass_nar_jeg_trenger_det)
+  sdf <- SA_text_to_numerallevels(sdf, hvor_enig_er_du_i_disse_pastandene_bruken_av_digitalt_utstyr_fungerer_godt_i_undervisningen)
+  
   #Svaralternativer: "1 = Ikke enig" - 5 = "Helt enig"	
   sdf <- SA_text_to_numerallevels(sdf, hvor_enig_er_du_i_disse_pastandene_det_er_lett_a_finne_informasjonen_jeg_trenger_i_canvas)
   sdf <- SA_text_to_numerallevels(sdf, hvor_enig_er_du_i_disse_pastandene_det_er_lett_a_finne_informasjonen_jeg_trenger_pa_student_oslomet_no)

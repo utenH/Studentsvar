@@ -1134,9 +1134,11 @@ datapakke_slim_variables_SB23 <- function(sdf) {
     "miljo_lokaler_13",
     "miljo_utstyr_13",
     "miljo_biblio_13",
+    "indx_fysmiljo4",
     "miljo_sosial_13",
     "miljo_fag_13",
     "miljo_studans_15",
+    "indx_psymiljo3",
     "organ_tilgjinfo_17",
     "organ_kvalinfo_17",
     "organ_admtilr_17",
@@ -1151,9 +1153,11 @@ datapakke_indikatorliste_SB23 <- c(
   "Lokaler for undervisning og øvrig studentarbeid",
   "Utstyr og hjelpemidler i undervisningen",
   "Bibliotek og bibliotekstjenester",
+  "Indeks fysisk læringsmiljø",
   "Tilfredshet med det sosiale miljøet blant studentene på studieprogrammet",
   "Tilfredshet med det faglige miljøet blant studentene på studieprogrammet",
   "Tilfredshet med miljøet mellom studentene og de faglig ansatte på studieprogrammet",
+  "Indeks faglig og sosialt læringsmiljø",
   "Tilfredshet med tilgjengelighet på informasjon om studieprogrammet",
   "Tilfredshet med kvaliteten på informasjonen om studieprogrammet",
   "Tilfredshet med den administrative tilretteleggingen av studieprogrammet (timeplan, studieplan etc)",
@@ -1167,10 +1171,15 @@ datapakke_slim_variables_SA23 <- function(sdf) {
     "Studieprogramkode", 
     "Studieprogram_instnamn",
     "undersøkelse_år",
+    "hvor_enig_er_du_i_disse_pastandene_det_er_god_luft_og_temperatur_i_undervisningsrommene",
+    "hvor_enig_er_du_i_disse_pastandene_jeg_og_mine_medstudenter_finner_et_egnet_sted_a_vaere_nar_vi_skal_jobbe_sammen_i_gruppe",
+    "hvor_enig_er_du_i_disse_pastandene_jeg_finner_lesesalsplass_nar_jeg_trenger_det",
+    "hvor_enig_er_du_i_disse_pastandene_bruken_av_digitalt_utstyr_fungerer_godt_i_undervisningen",
     "hvor_fornoyd_er_du_med_folgende_forhold_i_studieprogrammet_ditt_det_sosiale_miljoet_blant_studentene", 
     "hvor_fornoyd_er_du_med_folgende_forhold_i_studieprogrammet_ditt_det_faglige_miljo_blant_studentene", 
     "hvor_fornoyd_er_du_med_folgende_forhold_i_studieprogrammet_ditt_miljoet_mellom_undervisere_og_studenter",
     "hvor_enig_er_du_i_disse_pastandene_det_er_lett_a_finne_informasjonen_jeg_trenger_i_canvas",
+    "hvor_enig_er_du_i_disse_pastandene_det_er_lett_a_finne_informasjonen_jeg_trenger_pa_student_oslomet_no",
     "hvor_enig_er_du_i_disse_pastandene_det_er_godt_samsvar_mellom_informasjon_fra_undervisere_og_administrasjon"
     )
   )
@@ -1179,10 +1188,15 @@ datapakke_slim_variables_SA23 <- function(sdf) {
 
 # Må matche variabellista over
 datapakke_indikatorliste_SA23 <- c(
+  "Det er god luft og temperatur i undervisningsrommene",
+  "Jeg og mine medstudenter finner et egnet sted å være når vi skal jobbe sammen i gruppe",
+  "Jeg finner lesesalsplass når jeg trenger det",
+  "Bruken av digitalt utstyr fungerer godt i undervisningen",
   "Hvor fornøyd er du med det sosiale miljøet blant studentene?",
   "Hvor fornøyd er du med det faglige miljøet blant studentene?",
   "Hvor fornøyd er du med miljøet mellom undervisere og studenter?",
   "Det er lett å finne informasjonen jeg trenger i Canvas",
+  "Det er lett å finne informasjonen jeg trenger på student.oslomet.no",
   "Det er godt samsvar mellom informasjon fra undervisere og administrasjon"
 )
 
