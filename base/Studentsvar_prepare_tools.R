@@ -57,7 +57,8 @@ SB_prepare_2023 <- function(innfil, dataår, instnr) {
   OM <- SB_name_fak_kort(OM)
   if (instnr == 1175) {
     # legg til programnamn med instituttilhøyrigheit
-    OM <- OM_add_programdata(OM, "studprog_kod")
+    OM <- dbh_add_programdata(OM, "studprog_kod", instnr)
+    OM <- OM_add_programdata(OM, "Studieprogramkode")
     OM <- SB_add_nivå(OM)
   } else {
     OM <- dbh_add_programdata(OM, "studprog_kod", instnr)
@@ -71,6 +72,7 @@ SB_prepare_2023 <- function(innfil, dataår, instnr) {
 ##*  Andre datasett må vere vaska først
 SB_unntak <- function(sdf) {
   sdf$Fakultetsnavn[grepl("YFLH", sdf$Studieprogramkode)] <- "Fakultet for lærerutdanning og internasjonale studier (LUI)"
+  sdf$Institutt[grepl("YFLH", sdf$Studieprogramkode)] <- "Institutt for yrkesfaglærerutdanning"
   sdf <- sdf %>% mutate(Studieprogramnavn = coalesce(Studieprogramnavn, studiepgm_navn))
   sdf <- sdf %>% mutate(Nivåkode = coalesce(Nivåkode, STUDIENIVAKODE))
   return(sdf)
@@ -238,7 +240,7 @@ dbh_hent_programdata <- function(instnr = "1175") {
 
 ##** Hentar ein tabell med instituttnamn, kan koplast på kolonna Avdelingskode 
 dbh_hent_orgdata <- function(instnr) {
-  sdf <- dbh_data(457, filters = c("Institusjonskode" = instnr, "Årstall" = "2022"), 
+  sdf <- dbh_data(457, filters = c("Institusjonskode" = instnr, "Årstall" = "2023"), 
                   variables = c("Avdelingskode", "Avdelingskode_SSB", "Avdelingsnavn", "Årstall"), 
                   group_by = c("Avdelingskode", "Avdelingskode_SSB", "Avdelingsnavn", "Årstall")) %>% 
     # Alternativ måte: sjekke om Avdelingskode_SSB sluttar med 00, det er instituttnivå, 000 og opp må også bort?

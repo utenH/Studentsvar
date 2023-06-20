@@ -881,7 +881,6 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
 # - sjekk om den finst i SB: skriv ut
 # -sjekk om den finst i SA: skriv ut
 # Eksportere datapakke per fakultet til programrapport - fane for kvar utdanning
-# tidsserie - liste med datasett Studiebarometeret per siste tre år
 # SA_tidsserie <- list(SA23, SA22, SA21, ...)
 # SB_tidsserie <- list(SB22, SB21, SB20, ...)
 datapakke_print_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part = "") {
@@ -907,23 +906,44 @@ datapakke_print_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part =
   # Slå saman datasett
   SB_tidsserie <- bind_rows(SB_tidsserie)
   SA_tidsserie <- bind_rows(SA_tidsserie)
+  
+  # slå saman program som har endra studieprogramkode
+  SB_tidsserie <- SB_tidsserie %>% 
+    mutate(Studieprogramkode = case_when(
+      Studieprogramkode == "SYKK" ~ "SYKK+SPH", 
+      Studieprogramkode == "SPH" ~ "SYKK+SPH",
+      Studieprogramkode == "SYKP" ~ "SYKP+SYPLGR", 
+      Studieprogramkode == "SYPLGR" ~ "SYKP+SYPLGR",
+      TRUE ~ Studieprogramkode))
+  
+  SA_tidsserie <- SA_tidsserie %>% 
+    mutate(Studieprogramkode = case_when(
+      Studieprogramkode == "SYKK" ~ "SYKK+SPH", 
+      Studieprogramkode == "SPH" ~ "SYKK+SPH",
+      Studieprogramkode == "SYKP" ~ "SYKP+SYPLGR", 
+      Studieprogramkode == "SYPLGR" ~ "SYKP+SYPLGR",
+      TRUE ~ Studieprogramkode))
 
   ##** 
   ##* Tar bort utdanningar som ikkje finst i nyaste datasett
   # lage lister med alle programkodar frå nyaste år per undersøking
   # mellomlagre siste år
   SB_nyaste <- SB_tidsserie %>% select(undersøkelse_år) %>% max
-  SB_programliste <- SB_tidsserie %>% filter(undersøkelse_år == SB_nyaste, !is.na(Studieprogramkode)) %>% select(Studieprogramkode, fakultet) %>% unique %>% arrange(Studieprogramkode)
+  # SB_programliste <- SB_tidsserie %>% filter(undersøkelse_år == SB_nyaste, !is.na(Studieprogramkode)) %>% select(Studieprogramkode, fakultet) %>% unique %>% arrange(Studieprogramkode)
+  SB_programliste <- SB_tidsserie %>% filter(!is.na(Studieprogramkode)) %>% select(Studieprogramkode, fakultet) %>% unique %>% arrange(Studieprogramkode)
   SA_nyaste <- SA_tidsserie %>% select(undersøkelse_år) %>% max
-  SA_programliste <- SA_tidsserie %>% filter(undersøkelse_år == SA_nyaste, !is.na(Studieprogramkode)) %>% select(Studieprogramkode, fakultet) %>% unique %>% arrange(Studieprogramkode)
+  # SA_programliste <- SA_tidsserie %>% filter(undersøkelse_år == SA_nyaste, !is.na(Studieprogramkode)) %>% select(Studieprogramkode, fakultet) %>% unique %>% arrange(Studieprogramkode)
+  SA_programliste <- SA_tidsserie %>% filter(!is.na(Studieprogramkode)) %>% select(Studieprogramkode, fakultet) %>% unique %>% arrange(Studieprogramkode)
   
   # lage samla liste med begge, denne er den utskrifta skal iterere over
   datapakke_programliste <- bind_rows(SB_programliste, SA_programliste) %>% unique %>% arrange(Studieprogramkode)
   # SB_tidsserie <- SB_tidsserie %>% group_by(Studieprogramkode) %>% filter(any(SB_nyaste %in% undersøkelse_år)) %>% ungroup
-  
+
   # lage liste med fakultet
-  SB_fakultetliste <- SB_tidsserie %>% filter(undersøkelse_år == SB_nyaste) %>% select(fakultet) %>% unique %>% arrange(fakultet)
-  SA_fakultetliste <- SA_tidsserie %>% filter(undersøkelse_år == SA_nyaste) %>% select(fakultet) %>% unique %>% arrange(fakultet)
+  # SB_fakultetliste <- SB_tidsserie %>% filter(undersøkelse_år == SB_nyaste) %>% select(fakultet) %>% unique %>% arrange(fakultet)
+  # SA_fakultetliste <- SA_tidsserie %>% filter(undersøkelse_år == SA_nyaste) %>% select(fakultet) %>% unique %>% arrange(fakultet)
+  SB_fakultetliste <- SB_tidsserie %>% select(fakultet) %>% unique %>% arrange(fakultet)
+  SA_fakultetliste <- SA_tidsserie %>% select(fakultet) %>% unique %>% arrange(fakultet)
   datapakke_fakultetliste <- bind_rows(SB_fakultetliste, SA_fakultetliste) %>% unique %>% arrange(fakultet)
   
   # Grupper på fakultet
@@ -963,8 +983,8 @@ datapakke_print_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part =
                           'De som har svart "Vet ikke" eller "Usikker" er ikke med i beregningene.')
       forklaring_n <- paste("Til høyre for gjennomsnittene står antall respondenter (N) per indikator.\n",
                             "Dersom færre enn fire har svart, har vi ikke tatt med resultatet.\n",
-                            "Vi har tatt med tall for programkoder der vi har tall enten fra nyeste Studiebarometer eller Sisteårsundersøkelse.\n",
-                            "Studieprogram som har byttet programkode de siste årene, kan se på fane for tidligere programkode.\n",
+                            # "Vi har tatt med tall for programkoder der vi har tall enten fra nyeste Studiebarometer eller Sisteårsundersøkelse.\n",
+                            "Der studieprogram har byttet programkode de siste årene, vil data kunne ligge på ulike faner.\n",
                             "Det er viktig å huske at tallene i Sisteårsundersøkelsen og Studiebarometeret ikke gjelder samme studentkull.\n",
                             # "En kan derfor ikke forvente å observere sammenfallende trender i de to undersøkelsene.\n",
                             "Årstall viser til når undersøkelsen ble sendt ut.")
@@ -1064,7 +1084,7 @@ datapakke_print_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part =
 # Lagar datatabell med gjennomsnitt og N
 datapakke_byggtabell <- function(studieprogramdata, indikatorliste) {
   # Summering av snitt, gruppert på år
-  datapakke_utdata <- studieprogramdata %>% group_by(undersøkelse_år) %>% summarise(across(4:(ncol(studieprogramdata)-1), ~mean(., na.rm = T))) 
+  datapakke_utdata <- studieprogramdata %>% group_by(undersøkelse_år) %>% summarise(across(6:(ncol(studieprogramdata)-1), ~mean(., na.rm = T))) 
   # mellomlagre kolonne med årstal, for å kunne transformere tabell så variablane kjem som rader
   datapakke_utdata_år <- datapakke_utdata %>% select(1)
   # fjerner årstalkolonne og transformerer tabellen til vertikalt format
@@ -1083,7 +1103,7 @@ datapakke_byggtabell <- function(studieprogramdata, indikatorliste) {
   datapakke_utdata[datapakke_utdata == "NaN"] <- NA
   
   # N gruppert på år
-  datapakke_utdata_n <- studieprogramdata %>% group_by(undersøkelse_år) %>% summarise(across(4:(ncol(studieprogramdata)-1), ~sum(!is.na(.) )))
+  datapakke_utdata_n <- studieprogramdata %>% group_by(undersøkelse_år) %>% summarise(across(6:(ncol(studieprogramdata)-1), ~sum(!is.na(.) )))
   # mellomlagre kolonne med årstal, for å kunne transformere tabell så variablane kjem som rader
   # Legg til "N" før årstal for å kunne slå saman til ein tabell
   utdata_år <- datapakke_utdata_n %>% select(1)
@@ -1127,22 +1147,24 @@ datapakke_utrad_p <- function(sdf, sisteår, forrigeår) {
 # Select variables helper
 datapakke_slim_variables_SB23 <- function(sdf) {
   sdf %>% select(any_of(
-    c("fakultet", 
-    "Studieprogramkode", 
-    "Studieprogram_instnamn",
-    "undersøkelse_år",
-    "miljo_lokaler_13",
-    "miljo_utstyr_13",
-    "miljo_biblio_13",
-    "indx_fysmiljo4",
-    "miljo_sosial_13",
-    "miljo_fag_13",
-    "miljo_studans_15",
-    "indx_psymiljo3",
-    "organ_tilgjinfo_17",
-    "organ_kvalinfo_17",
-    "organ_admtilr_17",
-    "medvirk_innspill_18"
+    c("fakultet",
+      "Institutt",
+      "Studieprogramkode", 
+      "Studieprogram_instnamn",
+      "Nivå",
+      "undersøkelse_år",
+      "miljo_lokaler_13",
+      "miljo_utstyr_13",
+      "miljo_biblio_13",
+      "indx_fysmiljo4",
+      "miljo_sosial_13",
+      "miljo_fag_13",
+      "miljo_studans_15",
+      "indx_psymiljo3",
+      "organ_tilgjinfo_17",
+      "organ_kvalinfo_17",
+      "organ_admtilr_17",
+      "medvirk_innspill_18"
     )
   )
   )
@@ -1168,19 +1190,21 @@ datapakke_indikatorliste_SB23 <- c(
 datapakke_slim_variables_SA23 <- function(sdf) {
   sdf %>% select(any_of(
     c("fakultet", 
-    "Studieprogramkode", 
-    "Studieprogram_instnamn",
-    "undersøkelse_år",
-    "hvor_enig_er_du_i_disse_pastandene_det_er_god_luft_og_temperatur_i_undervisningsrommene",
-    "hvor_enig_er_du_i_disse_pastandene_jeg_og_mine_medstudenter_finner_et_egnet_sted_a_vaere_nar_vi_skal_jobbe_sammen_i_gruppe",
-    "hvor_enig_er_du_i_disse_pastandene_jeg_finner_lesesalsplass_nar_jeg_trenger_det",
-    "hvor_enig_er_du_i_disse_pastandene_bruken_av_digitalt_utstyr_fungerer_godt_i_undervisningen",
-    "hvor_fornoyd_er_du_med_folgende_forhold_i_studieprogrammet_ditt_det_sosiale_miljoet_blant_studentene", 
-    "hvor_fornoyd_er_du_med_folgende_forhold_i_studieprogrammet_ditt_det_faglige_miljo_blant_studentene", 
-    "hvor_fornoyd_er_du_med_folgende_forhold_i_studieprogrammet_ditt_miljoet_mellom_undervisere_og_studenter",
-    "hvor_enig_er_du_i_disse_pastandene_det_er_lett_a_finne_informasjonen_jeg_trenger_i_canvas",
-    "hvor_enig_er_du_i_disse_pastandene_det_er_lett_a_finne_informasjonen_jeg_trenger_pa_student_oslomet_no",
-    "hvor_enig_er_du_i_disse_pastandene_det_er_godt_samsvar_mellom_informasjon_fra_undervisere_og_administrasjon"
+      "Institutt",
+      "Studieprogramkode", 
+      "Studieprogram_instnamn",
+      "Nivå",
+      "undersøkelse_år",
+      "hvor_enig_er_du_i_disse_pastandene_det_er_god_luft_og_temperatur_i_undervisningsrommene",
+      "hvor_enig_er_du_i_disse_pastandene_jeg_og_mine_medstudenter_finner_et_egnet_sted_a_vaere_nar_vi_skal_jobbe_sammen_i_gruppe",
+      "hvor_enig_er_du_i_disse_pastandene_jeg_finner_lesesalsplass_nar_jeg_trenger_det",
+      "hvor_enig_er_du_i_disse_pastandene_bruken_av_digitalt_utstyr_fungerer_godt_i_undervisningen",
+      "hvor_fornoyd_er_du_med_folgende_forhold_i_studieprogrammet_ditt_det_sosiale_miljoet_blant_studentene", 
+      "hvor_fornoyd_er_du_med_folgende_forhold_i_studieprogrammet_ditt_det_faglige_miljo_blant_studentene", 
+      "hvor_fornoyd_er_du_med_folgende_forhold_i_studieprogrammet_ditt_miljoet_mellom_undervisere_og_studenter",
+      "hvor_enig_er_du_i_disse_pastandene_det_er_lett_a_finne_informasjonen_jeg_trenger_i_canvas",
+      "hvor_enig_er_du_i_disse_pastandene_det_er_lett_a_finne_informasjonen_jeg_trenger_pa_student_oslomet_no",
+      "hvor_enig_er_du_i_disse_pastandene_det_er_godt_samsvar_mellom_informasjon_fra_undervisere_og_administrasjon"
     )
   )
   )
@@ -1200,35 +1224,55 @@ datapakke_indikatorliste_SA23 <- c(
   "Det er godt samsvar mellom informasjon fra undervisere og administrasjon"
 )
 
-# TODO: etterlign oppsett på programnivå - ein del nytt i 2023
-# TODO: lag uttrekk på instituttnivå - instituttvariabel må då leggast til SB-data
 # Eksportere datapakke til fakultetsrapport - OsloMet-tal og per fakultet
-# SB_tidsserie - liste med datasett Studiebarometeret per siste tre år
-# SA_tidsserie - datasett for siste tre år i Sisteårsstudenten
-# nivå - 0 for bachelor, 1 for master
+# SB_tidsserie og SA_tidsserie - er lister med datasett Studiebarometeret og Sisteårsstudenten
+# SA_tidsserie <- list(SA23, SA22, SA21, ...)
+# SB_tidsserie <- list(SB22, SB21, SB20, ...)
+# nivå - "Bachelor", "Master", "Annet"
 datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part = "", nivå = "") {
-  # Del opp datasett, eldst til nyast, sett inn årstal
-  # bruk SB_tidsserie[[x]] for å velje
-  # # OBS oppdatere årstal
-  # I 2023-koda blir årstal satt ved import frå Excel, alle referansar til `år` må bli `undersøkelse_år`
-  # Y1 <- SB_tidsserie[[1]] %>% mutate(år = "2020")
-  # Y2 <- SB_tidsserie[[2]] %>% mutate(år = "2021")
-  # Y3 <- SB_tidsserie[[3]] %>% mutate(år = "2022")
+  # ved å sette vektoren indikatorliste_SB og funksjonen slim_variables_SB til år-spesifikke versjonar,
+  # kan resten av koden vere lik frå år til år, tilsvarande for Sisteårs
+  indikatorliste_SB <- datapakke_indikatorliste_SB23
+  slim_variables_SB <- datapakke_slim_variables_SB23
   
+  indikatorliste_SA <- datapakke_indikatorliste_SA23
+  slim_variables_SA <- datapakke_slim_variables_SA23
+  
+  # Reduser variablar
+  SB_tidsserie <- SB_tidsserie %>% lapply(slim_variables_SB)
+  SA_tidsserie <- SA_tidsserie %>% lapply(slim_variables_SA)
+  
+  # Slå saman datasett
+  SB_tidsserie <- bind_rows(SB_tidsserie)
+  SA_tidsserie <- bind_rows(SA_tidsserie)
+  
+  ##** 
+  ##* lage lister med alle institutt frå nyaste år per undersøking
+  ##* mellomlagre siste år
+  SB_nyaste <- SB_tidsserie %>% select(undersøkelse_år) %>% max
+  # SB_instituttliste <- SB_tidsserie %>% filter(undersøkelse_år == SB_nyaste, !is.na(Institutt)) %>% select(Institutt, fakultet) %>% unique %>% arrange(Institutt)
+  SB_instituttliste <- SB_tidsserie %>% filter(!is.na(Institutt)) %>% select(Institutt, fakultet) %>% unique %>% arrange(Institutt)
+  SA_nyaste <- SA_tidsserie %>% select(undersøkelse_år) %>% max
+  # SA_instituttliste <- SA_tidsserie %>% filter(undersøkelse_år == SA_nyaste, !is.na(Institutt)) %>% select(Institutt, fakultet) %>% unique %>% arrange(Institutt)
+  SA_instituttliste <- SA_tidsserie %>% filter(!is.na(Institutt)) %>% select(Institutt, fakultet) %>% unique %>% arrange(Institutt)
+  
+  # lage samla liste med begge, denne er den utskrifta skal iterere over
+  datapakke_instituttliste <- bind_rows(SB_instituttliste, SA_instituttliste) %>% unique %>% arrange(Institutt)
+  
+  # lage liste med fakultet
+  # SB_fakultetliste <- SB_tidsserie %>% filter(undersøkelse_år == SB_nyaste) %>% select(fakultet) %>% unique %>% arrange(fakultet)
+  # SA_fakultetliste <- SA_tidsserie %>% filter(undersøkelse_år == SA_nyaste) %>% select(fakultet) %>% unique %>% arrange(fakultet)
+  SB_fakultetliste <- SB_tidsserie %>% select(fakultet) %>% unique %>% arrange(fakultet)
+  SA_fakultetliste <- SA_tidsserie %>% select(fakultet) %>% unique %>% arrange(fakultet)
+  datapakke_fakultetliste <- bind_rows(SB_fakultetliste, SA_fakultetliste) %>% unique %>% arrange(fakultet)
+  
+  # mellomlagre nivånamn til bruk i arktittel 
+  titlepart <- nivå
+  # filtrere på nivå
   if (nivå != "") {
-    Y1 <- Y1 %>% filter(master == nivå)
-    Y2 <- Y2 %>% filter(master == nivå)
-    Y3 <- Y3 %>% filter(master == nivå)
-    
-    if (nivå == 0) {
-      titlepart <- "bachelor"
-      part <- paste(" bachelor", part)
-      SA_tidsserie <- SA_tidsserie %>% filter(master == "BA" | master == "4-årig studium" | master == "HK")
-    } else if (nivå == 1) {
-      titlepart <- "master"
-      part <- paste(" master", part)
-      SA_tidsserie <- SA_tidsserie %>% filter(master == "MA")
-    }
+    part <- paste0(" ", nivå, part)
+    SA_tidsserie <- SA_tidsserie %>% filter(Nivå == nivå)
+    SB_tidsserie <- SB_tidsserie %>% filter(Nivå == nivå)
   }
   
   # ved å sette vektoren indikatorliste_SB og funksjonen datapakke_slim_variables_SB til år-spesifikke versjonar,
@@ -1236,142 +1280,78 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
   indikatorliste_SB <- datapakke_indikatorliste_SB23
   slim_variables_SB <- datapakke_slim_variables_SB23
   
-  Y1 <- slim_variables_SB(Y1)
-  Y2 <- slim_variables_SB(Y2)
-  Y3 <- slim_variables_SB(Y3)
-  # # Tidsvariablar må justerast, slik at deltid ikkje blir tatt med
-  # Y1$tid_orgstudier[Y1$heltid < 1] <- NA
-  # Y2$tid_orgstudier[Y2$heltid < 1] <- NA
-  # Y3$tid_orgstudier[Y3$heltid < 1] <- NA
-  # 
-  # Y1$tid_egenstudier[Y1$heltid < 1] <- NA
-  # Y2$tid_egenstudier[Y2$heltid < 1] <- NA
-  # Y3$tid_egenstudier[Y3$heltid < 1] <- NA
-  # 
-  # Y1$sum_tid_studier[Y1$heltid < 1] <- NA
-  # Y2$sum_tid_studier[Y2$heltid < 1] <- NA
-  # Y3$sum_tid_studier[Y3$heltid < 1] <- NA
-  # 
-  # Y1$tidsbruk_laerakt_14[Y1$heltid < 1] <- NA
-  # Y2$tidsbruk_laerakt_14[Y2$heltid < 1] <- NA
-  # Y3$tidsbruk_laerakt_14[Y3$heltid < 1] <- NA
-  # 
-  # Y1$tidsbruk_egeninns_14[Y1$heltid < 1] <- NA
-  # Y2$tidsbruk_egeninns_14[Y2$heltid < 1] <- NA
-  # Y3$tidsbruk_egeninns_14[Y3$heltid < 1] <- NA
-  
-  # Slå saman datasett
-  ys <- bind_rows(Y1, Y2, Y3)
-  
-  # Grupper på fakultet
-  ys_fak <- ys %>% group_by(fakultet) %>% group_split()
-  
   # Berre ei fil, med fane for OsloMet + fakulteta
   sn <- 1
   wb <- createWorkbook()
   
   # Filnamn
-  path <- "C:\\Users\\kyrremat\\OneDrive - OsloMet\\Dokumenter\\statistikk\\Kvalitetsrapport datapakke R\\rapportfiler\\"
+  path <- "Rapportfiler/Kvalitetsrapport datapakkar/"
   nameroot <- "OsloMet datapakke 2023 aggregert"
   # if (part == "") part <- " testrapport"
   suf <- ".xlsx"
   # print(fak_n)
   SB_fil <- paste(path, nameroot, part, suf, sep = "")
+  print(SB_fil)
   
+  ##**
+  ##* Skrive ut for 
+  ##* * OsloMet
+  ##* * fakultet (loop fakultetliste)
+  ##* * institutt (loop instituttliste)
+  
+  # OsloMet-fane
+  addWorksheet(wb, "OsloMet")
+  arktittel <- "OsloMet"
   # Forklaringstekst
   forklaring <- paste('Indikatorene er gjennomsnitt på en femdelt skala der høy verdi er positivt.\n',
                       'Når svaralternativene er Ja/Nei, er indikatoren andel som har svart "Ja".\n',
                       'De som har svart "Vet ikke" eller "Usikker" er ikke med i beregningene.')
   forklaring_n <- paste("Til høyre for gjennomsnittene står antall respondenter (N) per indikator.\n",
                         "Dersom færre enn fire har svart, har vi ikke tatt med resultatet.\n",
-                        # "Vi har bare tatt med tall for programkoder der vi har data fra Studiebarometeret 2021.\n",
+                        # "Vi har tatt med tall for programkoder der vi har tall enten fra nyeste Studiebarometer eller Sisteårsundersøkelse.\n",
+                        # "Der studieprogram har byttet programkode de siste årene, vil data kunne ligge på ulike faner.\n",
                         "Det er viktig å huske at tallene i Sisteårsundersøkelsen og Studiebarometeret ikke gjelder samme studentkull.\n",
-                        "En kan derfor ikke forvente å observere sammenfallende trender i de to undersøkelsene.\n",
+                        # "En kan derfor ikke forvente å observere sammenfallende trender i de to undersøkelsene.\n",
                         "Årstall viser til når undersøkelsen ble sendt ut.")
   forklaring_tid <- paste()#"Når NOKUT/Rambøll presenterer tidsbruk, tar de med alle svar. OsloMet har hatt en praksis med å filtrere bort svar",
-                          # "der summen av tid til organisert læring, egenstudier og arbeid blir under 11 eller over 60 timer per uke.",
-                          # "Vi tar her med verdier for begge varianter, og har markert versjonene der vi tar med også svar som gir samlet tidsbruk under 11 og over 60 timer.")
+  # "der summen av tid til organisert læring, egenstudier og arbeid blir under 11 eller over 60 timer per uke.",
+  # "Vi tar her med verdier for begge varianter, og har markert versjonene der vi tar med også svar som gir samlet tidsbruk under 11 og over 60 timer.")
   forklaring_variabler <- paste()#"Indeksene er satt sammen av flere spørsmål, man må ha svart på de fleste av spørsmålene om et tema for at svarene skal bli inkludert i indeksen.")
-  
-  # OsloMet-fane
-  addWorksheet(wb, "OsloMet")
-  # Snitt
-  # utdata <- ys %>% group_by(år) %>% summarise(across(4:26, ~mean(., na.rm = T))) %>%
-  utdata <- ys %>% group_by(undersøkelse_år) %>% summarise(across(4:(ncol(ys)-1), ~mean(., na.rm = T))) %>%
-    data.frame(., row.names = 1) %>% t %>% as.data.frame() %>% rownames_to_column(., var="Variabel")
-  # N
-  # utdata_n <- ys %>% group_by(år) %>% summarise(across(4:26, ~sum(!is.na(.) )))%>% 
-  utdata_n <- ys %>% group_by(undersøkelse_år) %>% summarise(across(4:(ncol(ys)-1), ~sum(!is.na(.) )))%>% 
-    data.frame(., row.names = 1) %>% t %>% as.data.frame() %>% rownames_to_column(., var="Variabel")
-  
-  # Legg til spørsmålstekst
-  utdata <- utdata %>% mutate(Indikator = indikatorliste_SB)
-  utdata <- relocate(utdata, Indikator, .after = Variabel)
-  utdata <- utdata %>% subset(select = -Variabel)
-  
-  utdata_n <- utdata_n %>% subset(select = -Variabel)
-  utdata_n <- utdata_n %>% rename_with(~paste("N", .x))
-  
-  # Lag tabell for spørsmål frå Sisteårsstudenten
-  # 2023-indikatorar, vurder å lage indikatorliste som for SB:
-  # Hvor fornøyd er du med det sosiale miljøet blant studentene?
-  # Hvor fornøyd er du med det faglige miljøet blant studentene?
-  # Hvor fornøyd er du med miljøet mellom undervisere og studenter? 
-  # Det er lett å finne informasjonen jeg trenger i Canvas
-  # Det er godt samsvar mellom informasjon fra undervisere og administrasjon
-  # Snitt
-  sa_utdata <- SA_tidsserie %>% group_by(undersøkelse_år) %>% 
-    summarise(
-      mean(flerkulturell_kompetanse, na.rm = T), 
-      mean(nettbasert_internasjonalt, na.rm = T), 
-      mean(indx_praksis4, na.rm = T)) %>%
-    # mean(nyttigeemner, na.rm = T), 
-    # mean(godtlub, na.rm = T)) %>% 
-    data.frame(., row.names = 1) %>% t %>% as.data.frame() %>% rownames_to_column(., var="Variabel")
-  
-  # Gjer om til NA, for å rydde bort #NUM! i excelfila
-  sa_utdata[sa_utdata == "NaN"] <- NA
-  
-  # N
-  sa_utdata_n <- SA_tidsserie %>% group_by(undersøkelse_år) %>% 
-    summarise(
-      sum(!is.na(flerkulturell_kompetanse)), 
-      sum(!is.na(nettbasert_internasjonalt)), 
-      sum(!is.na(indx_praksis4))) %>%
-    # sum(!is.na(nyttigeemner)), 
-    # sum(!is.na(godtlub)) ) %>% 
-    data.frame(., row.names = 1) %>% t %>% as.data.frame() %>% rownames_to_column(., var="Variabel")
-  # TODO sjekk om desse kan oppdaterast til same kode som for fakultetsutskrift, 
-  # for å gjere dei meir robuste. Omnamninga er kanskje gjort betre her.
-  
-  # Legg til spørsmålstekst
-  # print(sa_utd[1,]$programkode)
-  sa_utdata <- 
-    sa_utdata %>% mutate(Indikator = 
-                           c("Studentenes opplevelse av læring som gir internasjonal og flerkulturell kompetanse (Andel svart ja)",
-                             # OBS: FÅ INN DENNE NÅR 2022-data kjem
-                             "Studentenes deltagelse i nettbaserte grupper med studenter fra andre land (Sisteårsstudenten, kun stilt i 2022)",
-                             "Studentenes tilfredshet med praksisstudiene (indeks Sisteårsstudenten)")) 
-  # c("Har alle emnene i studieprogrammet ditt vært nyttige (andel Ja)",
-  #   "Jeg er godt fornøyd med læringsutbyttet jeg har hatt på studieprogrammet"))
-  
-  sa_utdata <- relocate(sa_utdata, Indikator, .after = Variabel)
-  sa_utdata <- sa_utdata %>% subset(select = -Variabel)
-  
-  # Gjer om til NA, for å rydde bort #NUM! i excelfila
-  sa_utdata[sa_utdata == "NaN"] <- NA
-  
-  sa_utdata_n <- sa_utdata_n %>% subset(select = -Variabel)
-  sa_utdata_n <- sa_utdata_n %>% rename_with(~paste("N", .x))
-  
-  # Studiebarometeret
-  writeData(wb, sn, paste("OsloMet", titlepart, sep = " - "))
   
   writeData(wb, sn, forklaring, startRow = 2)
   writeData(wb, sn, forklaring_n, startRow = 3)
   addStyle(wb, sn, cols = 1, rows = 2:3, style = SB_style_wrap, gridExpand = T, stack = T)
   
   utrad <- 5
+  
+  # Studiebarometerdata
+  # Bygge tabellar med gjennomsnitt og N
+  datapakke_utdata <- datapakke_byggtabell(SB_tidsserie, indikatorliste_SB)
+  sb_utdata <- datapakke_utdata[[1]]
+  sb_utdata_n <- datapakke_utdata[[2]]
+  
+  # Slår saman snitt og N og fjernar resultat der det er færre enn fire som har svart
+  sb_utdata_full <- cbind(sb_utdata, sb_utdata_n)
+  kolonner <- ncol(sb_utdata)
+  for (x in 2:kolonner) {
+    sb_utdata_full[x][sb_utdata_full[(kolonner - 1) + x] < 4] <- NA
+  }
+  
+  utrad <- datapakke_writetable(wb,
+                                sn,
+                                paste("Studiebarometeret", arktittel, "–", nivå),
+                                sb_utdata_full,
+                                utrad,
+                                NROW(sb_utdata),
+                                NCOL(sb_utdata)
+  )
+  
+  # Sisteårsdata
+  
+  # Bygge tabellar med gjennomsnitt og N
+  datapakke_utdata <- datapakke_byggtabell(SA_tidsserie, indikatorliste_SA)
+  sa_utdata <- datapakke_utdata[[1]]
+  sa_utdata_n <- datapakke_utdata[[2]]
   
   # Slår saman snitt og N og fjernar resultat der det er færre enn fire som har svart
   sa_utdata_full <- cbind(sa_utdata, sa_utdata_n)
@@ -1380,48 +1360,14 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
     sa_utdata_full[x][sa_utdata_full[(kolonner - 1) + x] < 4] <- NA
   }
   
-  # Sisteårsstudenten
-  writeData(wb, sn, "Sisteårsstudenten - OsloMet", startRow = utrad)
-  utrad <- utrad + 1
-  # Slår saman til éin tabell og skriv ut
-  writeDataTable(wb, sn, sa_utdata_full, startRow = utrad, keepNA = T, na.string = "-")
-  utrad <- utrad + 1
-  addStyle(wb, sn, cols = 2:NCOL(sa_utdata), rows = utrad:(utrad + 1), style = SB_style_perc, gridExpand = T, stack = T)
-  utrad <- utrad + 2
-  snitt_sluttkol <- NCOL(sa_utdata)
-  addStyle(wb, sn, cols = 2:snitt_sluttkol, rows = utrad, style = SB_style_num, gridExpand = T, stack = T)
-  # writeDataTable(wb, sn, sa_utdata, startRow = utrad)
-  # addStyle(wb, sn, cols = 2:NCOL(sa_utdata), rows = utrad + 1, style = SB_style_perc, gridExpand = T, stack = T)
-  # 
-  # nkol <- NCOL(sa_utdata) + 1
-  # writeDataTable(wb, sn, sa_utdata_n, startRow = utrad, startCol = nkol)
-  
-  utrad <- utrad + 2
-  
-  # Slår saman snitt og N og fjernar resultat der det er færre enn fire som har svart
-  sb_utdata_full <- cbind(utdata, utdata_n)
-  kolonner <- ncol(utdata)
-  for (x in 2:kolonner) {
-    sb_utdata_full[x][sb_utdata_full[(kolonner - 1) + x] < 4] <- NA
-  }
-  
-  writeData(wb, sn, "Studiebarometeret - OsloMet", startRow = utrad)
-  utrad <- utrad + 1
-  # Skriv ut
-  writeDataTable(wb, sn, sb_utdata_full, startRow = utrad, keepNA = T, na.string = "-")
-  snitt_startrad <- utrad
-  snitt_sluttrad <- NROW(utdata) + utrad
-  snitt_sluttkol <- NCOL(utdata)
-  addStyle(wb, sn, cols = 2:snitt_sluttkol, rows = snitt_startrad:snitt_sluttrad, style = SB_style_num, gridExpand = T, stack = T)
-  # # Snitt
-  # writeDataTable(wb, sn, utdata, startRow = utrad)
-  # # N
-  # nkol <- NCOL(utdata) + 1
-  # writeDataTable(wb, sn, utdata_n, startRow = utrad, startCol = nkol)
-  # 
-  utrad <- snitt_sluttrad + 2
-  writeData(wb, sn, forklaring_variabler, startRow = utrad)
-  
+  utrad <- datapakke_writetable(wb,
+                                sn,
+                                paste("Sisteårsstudenten", arktittel, "–", nivå),
+                                sa_utdata_full,
+                                utrad,
+                                NROW(sa_utdata),
+                                NCOL(sa_utdata)
+  )
   
   # Stil
   setColWidths(wb, sn, cols = 1, widths = c(100))
@@ -1429,78 +1375,56 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
   addStyle(wb, sn, cols = 1, rows = 1, style = SB_style_bold, gridExpand = T, stack = T)
   addStyle(wb, sn, cols = 1, rows = utrad, style = SB_style_wrap, gridExpand = T, stack = T)
   
+  writeData(wb, sn, paste(arktittel, "–", nivå), startCol = 1, startRow = 1)
+  
   sn <- sn + 1
   # slutt OsloMet-fane
   
-  for (fak in ys_fak) {
-    fak_n <- fak[1,]$fakultet
-    # fak_lang <- fak[1,]$FAKNAVN
-    
-    # Snitt
-    # utdata <- fak %>% group_by(år) %>% summarise(across(4:26, ~mean(., na.rm = T))) %>% 
-    utdata <- fak %>% group_by(undersøkelse_år) %>% summarise(across(4:(ncol(fak)-1), ~mean(., na.rm = T))) %>% 
-      data.frame(., row.names = 1) %>% t %>% as.data.frame() %>% rownames_to_column(., var="Variabel")
-    
-    # N
-    # utdata_n <- fak %>% group_by(år) %>% summarise(across(4:26, ~sum(!is.na(.) )) ) %>% 
-    utdata_n <- fak %>% group_by(undersøkelse_år) %>% summarise(across(4:(ncol(fak)-1), ~sum(!is.na(.) )) ) %>% 
-      data.frame(., row.names = 1) %>% t %>% as.data.frame() %>% rownames_to_column(., var="Variabel")
-    
-    # Legg til spørsmålstekst
-    utdata <- utdata %>% mutate(Indikator = indikatorliste_SB)
-    utdata <- relocate(utdata, Indikator, .after = Variabel)
-    utdata <- utdata %>% subset(select = -Variabel)
-    
-    utdata_n <- utdata_n %>% subset(select = -Variabel)
-    utdata_n <- utdata_n %>% rename_with(~paste("N", .x))
-    # print(utdata %>% names)
-    
-    # Lag tabell for spørsmål frå Sisteårsstudenten
-    sa_f <- SA_tidsserie %>% filter(fakultet == fak_n)
-    
-    # Snitt
-    sa_utdata <- sa_f %>% group_by(undersøkelse_år) %>% 
-      summarise(
-        mean(flerkulturell_kompetanse, na.rm = T), 
-        mean(nettbasert_internasjonalt, na.rm = T), 
-        mean(indx_praksis4, na.rm = T)) %>%
-      # mean(nyttigeemner, na.rm = T), 
-      # mean(godtlub, na.rm = T)) %>% 
-      data.frame(., row.names = 1) %>% t %>% as.data.frame() %>% rownames_to_column(., var="Variabel")
-    
-    # N
-    sa_utdata_n <- sa_f %>% group_by(år) %>% 
-      summarise(
-        sum(!is.na(flerkulturell_kompetanse)), 
-        sum(!is.na(nettbasert_internasjonalt)), 
-        sum(!is.na(indx_praksis4))) %>%
-      # sum(!is.na(nyttigeemner)), 
-      # sum(!is.na(godtlub)) ) %>% 
-      data.frame(., row.names = 1) %>% t %>% as.data.frame() %>% rownames_to_column(., var="Variabel")
-    
-    # Legg til spørsmålstekst
-    sa_utdata <- 
-      sa_utdata %>% mutate(Indikator = indikatorliste_SA)
-    
-    # Legg til spørsmålstekst, tar bort variabelnamn
-    sa_utdata <- relocate(sa_utdata, Indikator, .after = Variabel)
-    sa_utdata <- sa_utdata %>% subset(select = -Variabel)
-    # Gjer om til NA, for å rydde bort #NUM! i excelfila
-    sa_utdata[sa_utdata == "NaN"] <- NA
-    
-    sa_utdata_n <- sa_utdata_n %>% subset(select = -Variabel)
-    sa_utdata_n <- sa_utdata_n %>% rename_with(~paste("N", .x))
-    # print(sa_utdata)
-    
+  ##** 
+  ##* Loop gjennom fakultet, eitt ark per fakultet
+  ##* 
+  
+  for (fak_n in datapakke_fakultetliste$fakultet) {
     addWorksheet(wb, fak_n)
-    # Studiebarometeret
-    writeData(wb, sn, paste(fak_n, titlepart, sep = " - "))
+    arktittel <- fak_n
     
     writeData(wb, sn, forklaring, startRow = 2)
     writeData(wb, sn, forklaring_n, startRow = 3)
     addStyle(wb, sn, cols = 1, rows = 2:3, style = SB_style_wrap, gridExpand = T, stack = T)
     
     utrad <- 5
+    
+    # Studiebarometerdata
+    sb_fak <- SB_tidsserie %>% filter(fakultet == fak_n)
+    
+    # Bygge tabellar med gjennomsnitt og N
+    datapakke_utdata <- datapakke_byggtabell(sb_fak, indikatorliste_SB)
+    sb_utdata <- datapakke_utdata[[1]]
+    sb_utdata_n <- datapakke_utdata[[2]]
+    
+    # Slår saman snitt og N og fjernar resultat der det er færre enn fire som har svart
+    sb_utdata_full <- cbind(sb_utdata, sb_utdata_n)
+    kolonner <- ncol(sb_utdata)
+    for (x in 2:kolonner) {
+      sb_utdata_full[x][sb_utdata_full[(kolonner - 1) + x] < 4] <- NA
+    }
+    
+    utrad <- datapakke_writetable(wb,
+                                  sn,
+                                  paste("Studiebarometeret", arktittel, "–", nivå),
+                                  sb_utdata_full,
+                                  utrad,
+                                  NROW(sb_utdata),
+                                  NCOL(sb_utdata)
+    )
+    
+    # Sisteårsdata
+    sa_fak <- SA_tidsserie %>% filter(fakultet == fak_n)
+    
+    # Bygge tabellar med gjennomsnitt og N
+    datapakke_utdata <- datapakke_byggtabell(sa_fak, indikatorliste_SA)
+    sa_utdata <- datapakke_utdata[[1]]
+    sa_utdata_n <- datapakke_utdata[[2]]
     
     # Slår saman snitt og N og fjernar resultat der det er færre enn fire som har svart
     sa_utdata_full <- cbind(sa_utdata, sa_utdata_n)
@@ -1509,54 +1433,14 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
       sa_utdata_full[x][sa_utdata_full[(kolonner - 1) + x] < 4] <- NA
     }
     
-    # Sisteårsstudenten
-    writeData(wb, sn, paste("Sisteårsstudenten", fak_n), startRow = utrad)
-    utrad <- utrad + 1
-    
-    # Slår saman til éin tabell og skriv ut
-    writeDataTable(wb, sn, sa_utdata_full, startRow = utrad, keepNA = T, na.string = "-")
-    # snitt_startrad <- utrad
-    snitt_sluttrad <- NROW(utdata) + utrad
-    snitt_sluttkol <- NCOL(utdata)
-    
-    utrad <- utrad + 1
-    addStyle(wb, sn, cols = 2:NCOL(sa_utdata), rows = utrad:(utrad + 1), style = SB_style_perc, gridExpand = T, stack = T)
-    utrad <- utrad + 2
-    addStyle(wb, sn, cols = 2:snitt_sluttkol, rows = utrad:snitt_sluttrad, style = SB_style_num, gridExpand = T, stack = T)
-    
-    # writeDataTable(wb, sn, sa_utdata, startRow = utrad)
-    # addStyle(wb, sn, cols = 2:NCOL(sa_utdata), rows = utrad + 1, style = SB_style_perc, gridExpand = T, stack = T)
-    # 
-    # nkol <- NCOL(sa_utdata) + 1
-    # writeDataTable(wb, sn, sa_utdata_n, startRow = utrad, startCol = nkol)#, startCol = 6)
-    utrad <- utrad + 2
-    
-    # Slår saman snitt og N og fjernar resultat der det er færre enn fire som har svart
-    sb_utdata_full <- cbind(utdata, utdata_n)
-    kolonner <- ncol(utdata)
-    for (x in 2:kolonner) {
-      sb_utdata_full[x][sb_utdata_full[(kolonner - 1) + x] < 4] <- NA
-    }
-    
-    writeData(wb, sn, paste("Studiebarometeret", fak_n), startRow = utrad)
-    utrad <- utrad + 1
-    
-    # Slår saman til éin tabell og skriv ut
-    writeDataTable(wb, sn, sb_utdata_full, startRow = utrad, keepNA = T, na.string = "-")
-    snitt_startrad <- utrad
-    snitt_sluttrad <- NROW(utdata) + utrad
-    snitt_sluttkol <- NCOL(utdata)
-    addStyle(wb, sn, cols = 2:snitt_sluttkol, rows = snitt_startrad:snitt_sluttrad, style = SB_style_num, gridExpand = T, stack = T)
-    
-    # # Snitt
-    # writeDataTable(wb, sn, utdata, startRow = utrad)
-    # 
-    # # N
-    # nkol <- NCOL(utdata) + 1
-    # writeDataTable(wb, sn, utdata_n, startRow = utrad, startCol = nkol)
-    
-    utrad <- snitt_sluttrad + 2
-    writeData(wb, sn, forklaring_variabler, startRow = utrad)
+    utrad <- datapakke_writetable(wb,
+                                  sn,
+                                  paste("Sisteårsstudenten", arktittel, "–", nivå),
+                                  sa_utdata_full,
+                                  utrad,
+                                  NROW(sa_utdata),
+                                  NCOL(sa_utdata)
+    )
     
     # Stil
     setColWidths(wb, sn, cols = 1, widths = c(100))
@@ -1564,11 +1448,96 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
     addStyle(wb, sn, cols = 1, rows = 1, style = SB_style_bold, gridExpand = T, stack = T)
     addStyle(wb, sn, cols = 1, rows = utrad, style = SB_style_wrap, gridExpand = T, stack = T)
     
+    writeData(wb, sn, paste(arktittel, "–", nivå), startCol = 1, startRow = 1)
     sn <- sn + 1
     
     # *****************
-  } # END print loop
+  } # END fakultetsloop
   # *****************
+  
+  ##** 
+  ##* Loop gjennom institutt, eitt ark per institutt
+  ##* 
+  
+  for (institutt_n in datapakke_instituttliste$Institutt) {
+    # Studiebarometerdata
+    sb_institutt <- SB_tidsserie %>% filter(Institutt == institutt_n)
+    
+    # Sisteårsdata
+    sa_institutt <- SA_tidsserie %>% filter(Institutt == institutt_n)
+    
+    if (sb_institutt %>% nrow == 0 & sa_institutt %>% nrow == 0) {
+      print(paste(institutt_n, "manglar data for nivået", nivå))
+      next;
+    }
+    
+    addWorksheet(wb, str_trunc(institutt_n, 31))
+    arktittel <- institutt_n
+    
+    writeData(wb, sn, forklaring, startRow = 2)
+    writeData(wb, sn, forklaring_n, startRow = 3)
+    addStyle(wb, sn, cols = 1, rows = 2:3, style = SB_style_wrap, gridExpand = T, stack = T)
+    
+    utrad <- 5
+    
+    # Studiebarometeret
+    # Bygge tabellar med gjennomsnitt og N
+    datapakke_utdata <- datapakke_byggtabell(sb_institutt, indikatorliste_SB)
+    sb_utdata <- datapakke_utdata[[1]]
+    sb_utdata_n <- datapakke_utdata[[2]]
+    
+    # Slår saman snitt og N og fjernar resultat der det er færre enn fire som har svart
+    sb_utdata_full <- cbind(sb_utdata, sb_utdata_n)
+    kolonner <- ncol(sb_utdata)
+    if (kolonner >= 3) {
+      for (x in 2:kolonner) {
+        sb_utdata_full[x][sb_utdata_full[(kolonner - 1) + x] < 4] <- NA
+      }
+    }
+    utrad <- datapakke_writetable(wb,
+                                  sn,
+                                  paste("Studiebarometeret", arktittel, "–", nivå),
+                                  sb_utdata_full,
+                                  utrad,
+                                  NROW(sb_utdata),
+                                  NCOL(sb_utdata)
+    )
+    
+    
+    # Sisteårs
+    # Bygge tabellar med gjennomsnitt og N
+    datapakke_utdata <- datapakke_byggtabell(sa_institutt, indikatorliste_SA)
+    sa_utdata <- datapakke_utdata[[1]]
+    sa_utdata_n <- datapakke_utdata[[2]]
+    
+    # Slår saman snitt og N og fjernar resultat der det er færre enn fire som har svart
+    sa_utdata_full <- cbind(sa_utdata, sa_utdata_n)
+    kolonner <- ncol(sa_utdata)
+    if (kolonner >= 3) {
+      for (x in 2:kolonner) {
+        sa_utdata_full[x][sa_utdata_full[(kolonner - 1) + x] < 4] <- NA
+      }
+    }
+    utrad <- datapakke_writetable(wb,
+                                  sn,
+                                  paste("Sisteårsstudenten", arktittel, "–", nivå),
+                                  sa_utdata_full,
+                                  utrad,
+                                  NROW(sa_utdata),
+                                  NCOL(sa_utdata)
+    )
+    
+    # Stil
+    setColWidths(wb, sn, cols = 1, widths = c(100))
+    addStyle(wb, sn, cols = 1, rows = 1, style = SB_style_header, gridExpand = T, stack = T)
+    addStyle(wb, sn, cols = 1, rows = 1, style = SB_style_bold, gridExpand = T, stack = T)
+    addStyle(wb, sn, cols = 1, rows = utrad, style = SB_style_wrap, gridExpand = T, stack = T)
+    
+    writeData(wb, sn, paste(arktittel, "–", nivå), startCol = 1, startRow = 1)
+    sn <- sn + 1 
+  } # ****************** 
+    # END instituttloop
+    # ******************
   
   # Lagre fil
   saveWorkbook(wb, SB_fil, overwrite = TRUE)
