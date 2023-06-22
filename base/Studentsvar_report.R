@@ -1548,14 +1548,14 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
 # Fritekst ------------------------------------------------------------------------------------
 
 # deler fritekstdata i filer gruppert på institutt
-SA_fritekst_xlsx_2022 <- function(sdf, rapportmappe, variabler) {
+SA_fritekst_xlsx_2023 <- function(sdf, rapportmappe, variabler) {
   tabell_stil <- createStyle(wrapText = T, valign = "top")
   svarkol_stil <- createStyle(numFmt = "TEXT")
   # rapportmappe <- "C:\\Users\\kyrremat\\OneDrive - OsloMet\\Dokumenter\\statistikk\\sisteårs\\SA Instituttfiler fritekst 2022\\"
   for (inst in sdf) {
-    instituttnamn <- inst$institutt[1]
+    instituttnamn <- inst$Institutt[1]
     # Velge og sortere kolonner
-    inst <- inst %>% select(Programkode, Studieprogramnavn, "Nivå" = grad, 12, 15, 40, 34) %>% arrange(Programkode)
+    inst <- inst %>% select(Studieprogramkode, Studieprogramnavn, Nivå, 2, 7, 4, 6) %>% arrange(Studieprogramkode)
     
     # TODO ikkje ta med kolonner som er heilt tomme
     not_all_na <- function(x) any(!is.na(x))
@@ -1563,12 +1563,12 @@ SA_fritekst_xlsx_2022 <- function(sdf, rapportmappe, variabler) {
     inst <- inst %>% mutate(across(where(is.character), str_trim))
     
     wb <- createWorkbook()
-    addWorksheet(wb, "Sisteårsstudenten fritekst 2022")
+    addWorksheet(wb, "Sisteårsstudenten fritekst 2023")
     writeDataTable(wb, 1, inst)
     
     ## stil
     datalengde <- NROW(inst) + 1
-    setColWidths(wb, 1, cols = 1:7, widths = c(10, 40, 6.5, 50, 50, 50, 50))
+    setColWidths(wb, 1, cols = 1:7, widths = c(18, 35, 8, 50, 50, 50, 50))
     # addStyle(wb, 1, cols = 5, rows = 2:datalengde, svarkol_stil, gridExpand = T, stack = T)
     addStyle(wb, 1, cols = 1:7, rows = 1:datalengde, tabell_stil, gridExpand = T, stack = T)
     
@@ -1577,7 +1577,7 @@ SA_fritekst_xlsx_2022 <- function(sdf, rapportmappe, variabler) {
                  paste0(rapportmappe, instituttnamn, ".xlsx"),
                  overwrite = TRUE)
   }
-} #end SA_fritekst_xlsx_2022
+} #end SA_fritekst_xlsx_2023
 
 
 # Skriv ut filer med fritekst per institutt

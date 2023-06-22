@@ -97,16 +97,20 @@ SA_prepare_2023 <- function(innfil, dataår, instnr) {
 } 
 
 ## Koder og lagar df for data frå eitt år
-# Fritekst analyse - lagt til 2022
 SA_prepare_fritekst <- function(datafil) {
   SA_raw <- read_excel(datafil)
   SA <- as.data.frame(SA_raw)
-  SA <- SA %>% rename("studprog_kod" = `fs-kode`)
+  # SA <- SA %>% rename("studprog_kod" = `fs-kode`)
   # SA <- SB_name_institute(SA)
-  SA <- SA %>% rename("Programkode" = "studprog_kod")
+  # SA <- SA %>% rename("Programkode" = "studprog_kod")
   # SA <- dbh_add_programnavn(SA, "Programkode")
-  SA <- dbh_add_programdata(SA, "Programkode", 1175)
+  SA <- dbh_add_programdata(SA, "progkode", 1175)
   print(SA %>% names)
+  manglar_institutt <- SA %>% filter(is.na(Institutt)) %>% select(StudiumID) %>% unique
+  if (manglar_institutt %>% nrow > 0){
+    print("Program som ikkje er plassert på institutt:")
+    print(manglar_institutt)
+    }
   SA <- SA %>% group_by(Institutt) %>% group_split()
   return(SA)
 }
