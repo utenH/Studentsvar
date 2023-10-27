@@ -1,6 +1,316 @@
 options(OutDec = ",")
 options("openxlsx.numFmt" = "#,#0.00")
 
+##** 
+##* Lagar tabellar med oversikt over studietilbod for siste tre år
+##* Eitt ark per studiestad – fakultet – nivå, viser registrerte studentar og fullførte per program
+##* 
+##* TODO: Få inn doktorgradskandidatar (registrerte: dbh_115, avlagte: dbh_101)
+##* 
+##* TODO: lage statistikk (til diagram) som viser 
+##* * totalt omfang utdanningar og studentar, fordelt på studiestad/fakultet/institutt/nivå
+##* * fordeling av andel av heltid, andel praksis fordelt på nivå og studiestad
+##* 
+##* TODO: Vurdere om vi skal vise fram retningar i paraply på noko vis
+##* 
+SP_studietilbod_OM <- function(ut_fil = NULL) {
+  # Hentar alle studietilbod for å få variablar for studieprogram
+  studietilbod <- dbh_hent_programdata() %>% filter(Årstall == 2023) %>% 
+    select(-Årstall, -Avdelingskode_SSB, -Avdelingskode, -Fakultetskode)
+  studietilbod <- studietilbod %>% filter(Studieprogramkode != "SPH", Studieprogramkode != "SYPLGR")
+  
+  # Hentar registrerte studentar i 1. og 2. syklus
+  registrerte_OM <- dbh_data(124, filters=c("Institusjonskode"="1175"), 
+                             group_by=c("Stednavn campus", "Studieprogramkode", "Årstall", "Semester"))
+  
+  # Hentar registrerte personar i 3. syklus
+  registrerte_OM_phd <- dbh_data(115, filters=c("Institusjonskode"="1175"), 
+                                 group_by=c("Studieprogramkode", "Årstall", "Semester")) %>%
+    rename("Antall" = "Antall totalt") %>%
+    select(Studieprogramkode, Årstall, Antall, Semester)
+  
+  # Slår saman til tabell med alle registrerte personar på studieprogram
+  registrerte_OM <- bind_rows(registrerte_OM, registrerte_OM_phd)
+  
+  # Slår saman koder som har endra seg men som viser til same program
+  # Filterer bort eldre studium
+  registrerte_OM <- registrerte_OM %>% 
+    kople_studieprogramkode(vis_samla_kode = F) %>%
+    rename(Studiested = `Stednavn campus`) %>%
+    filter(Årstall > 2020, Semester == 3, Studiested != "Sandvika" | is.na(Studiested)) %>%
+    select(-Semester) 
+  
+  # Lagar tabell med registrerte fordelt på år
+  registrerte_OM_pivot <- registrerte_OM  %>% 
+    pivot_wider(names_from = Årstall, values_from = Antall, names_prefix = "Registrerte ", 
+                values_fn = {sum}, names_sort = T)
+
+  # Slår saman med studieprogramvariablane
+  studietilbod <- left_join(studietilbod, registrerte_OM_pivot, "Studieprogramkode")
+  
+  # Hentar data om fullførte studieprogram i 1. og 2. syklus
+  fullfort_OM <- dbh_data(118, filters=c("Institusjonskode"="1175"), 
+                            group_by=c("Studieprogramkode", "Årstall", "Andel av heltid")) %>%
+    rename("Antall" = "Antall totalt") 
+  
+  # Hentar personar i 3. syklus med avlagt avhandling
+  fullfort_OM_phd <- dbh_data(101, filters=c("Institusjonskode"="1175"), 
+                                 group_by=c("Studieprogramkode", "Årstall")) %>%
+    rename("Antall" = "Antall totalt") %>%
+    select(Studieprogramkode, Årstall, Antall)
+  
+  # Slår saman til tabell med alle registrerte personar på studieprogram
+  fullfort_OM <- bind_rows(fullfort_OM, fullfort_OM_phd) 
+  
+  # Slår saman koder som har endra seg men som viser til same program
+  # Filterer bort eldre studium
+  fullfort_OM <- fullfort_OM %>% 
+    kople_studieprogramkode(vis_samla_kode = F) %>%
+    filter(Årstall > 2020) %>% select(-`Andel av heltid`, -`Antall kvinner`, -`Antall menn`) 
+  
+  # Lagar tabell med fullførte fordelt på år
+  fullfort_OM_pivot <- fullfort_OM %>%
+    pivot_wider(names_from = Årstall, values_from = Antall, names_prefix = "Fullførte ", 
+                values_fn = {sum}, names_sort = T)
+  
+  # Slår saman med studieprogramvariablane
+  studietilbod <- left_join(studietilbod, fullfort_OM_pivot, "Studieprogramkode") %>%
+    filter(!(is.na(`Registrerte 2022`) & is.na(`Registrerte 2023`) & is.na(`Fullførte 2023`)))# | 
+  
+  # Ryddar i manglande studiestad
+  studietilbod <- studietilbod %>% mutate(Studiested = case_when(
+    Nivåkode == "FU" & is.na(Studiested) ~ "OsloMet",
+    is.na(Studiested) ~ "Uplassert",
+    TRUE ~ Studiested))  
+
+  studietilbod <- studietilbod %>% relocate(Fakultetsnavn, Studiested, Institutt)
+  studietilbod <- studietilbod %>% mutate(Syklus = case_when(
+    grepl("AR|HN|LN|YU|VS", Nivåkode) ~ "Andre",
+    grepl("B3|HK", Nivåkode) ~ "Bachelor",
+    grepl("M2|ME|M5", Nivåkode) ~ "Master",
+    grepl("FU", Nivåkode) ~ "Forskerutdanning"
+  ))
+  
+  if (!is.null(ut_fil)) {
+    # Skriv ut til fil
+    arbeidsbok <- createWorkbook()
+    
+    # Lagar nokre overordna statistikkar
+    
+    # Dele opp for å skrive ut per ark
+    studietilbod <- studietilbod %>% group_by(Studiested, Fakultetsnavn, Syklus) %>% 
+      arrange(Institutt, Nivåkode, Studieprogramkode)
+    
+    studietilbod <- studietilbod %>% group_split()
+    
+    # Gå gjennom dei ulike delane og skriv til ark i arbeidsbok
+    for (utsnitt in studietilbod) {
+      utsnittID <- paste(utsnitt$Studiested[1], utsnitt$Fakultetsnavn[1], utsnitt$Syklus[1])
+      arktittel <- paste(utsnitt$Fakultetsnavn[1], utsnitt$Studiested[1], utsnitt$Syklus[1], sep = " – ")
+      print(utsnittID)
+      addWorksheet(arbeidsbok, utsnittID)
+      utsnitt <- utsnitt %>% select(-Fakultetsnavn, -Institutt, -Studieprogramkode, -Nivåkode, -"Tilbys til",
+                                    -Studiested, -`Andel av heltid`, -`Andel praksis`, -Syklus)
+      
+      writeData(arbeidsbok, utsnittID, arktittel)
+      writeDataTable(arbeidsbok, utsnittID, utsnitt, startRow = 3,
+                     tableStyle = "TableStyleMedium2")
+      setColWidths(arbeidsbok, utsnittID, cols = 1, widths = c(75))
+      addStyle(arbeidsbok, utsnittID, cols = 1:7, rows = 3, style = SB_style_wrap, gridExpand = T, stack = T)
+    }
+    saveWorkbook(arbeidsbok, ut_fil, overwrite = TRUE)
+  }
+  
+  if (is.null(ut_fil)) {
+    return(studietilbod)
+  }
+}
+
+##**
+##* Hentar studiepoengproduksjon, filtrert slik DBH gjer det
+##* 
+SP_studiepoengproduksjon <- function(eldsteår) {
+  sp_prod <- dbh_hent_studiepoengdata(1175)
+  sp_prod <- sp_prod %>% filter(Årstall >= eldsteår)
+  
+  sp_prod <- sp_prod %>% rename(Studieprogramkode = `Progkode emne`)
+  
+  sp_prod <- left_join(sp_prod, select(dbh_programdata, Studieprogramkode, Nivåkode), by="Studieprogramkode")
+  
+  sp_prod_filtrert <- sp_prod %>% filter(Studentkategori == "S", !grepl("FU", Nivåkode))
+  return(sp_prod_filtrert)
+}
+
+SP_studieoversikt_2023 <- function() {
+  ##** 
+  ##* INNHALD
+  ##*
+  ##* Studieplassar (dbh_370)
+  ##* Kvalifiserte 1.pri per plass (dbh_379)
+  ##* Registrert per plass (dbh_379) (dbh_124 gir alle aktive, ikkje berre per opptak)
+  ##* 
+  ##* Fullført normert (bachelor/master) (dbh_707) + sp_gjennomfort/sp_planlagt (dbh_335)
+  ##* Kandidatar/fullførte (dbh_118)
+  ##* 
+  ##* Alt i alt tilfreds Sisteårs
+  ##* Andel relevant arbeid (bachelor), Grad relevant arbeid (master)
+  
+  ##** 
+  ##* Søkartal
+  ##* 
+  dbh_379 <- dbh_data(379, filters = c("Institusjonskode"="1175"), 
+                      group_by = c("Studieprogramkode", "Årstall", "Kvalifisert", "Prioritet", "Semester", "Opptakstype"))
+  opptakstal_SO <- dbh_379 %>%  filter(Prioritet == 1, Kvalifisert == 1, Opptakstype == "N",  Årstall >= 2021)
+  opptakstal_LOK <- dbh_379 %>%  filter(Prioritet == 1, Kvalifisert == 1, Opptakstype == "L",  Årstall >= 2021)
+  
+  # kval_tidsserie <- ferdige_kvalifikasjonar()
+  # kvalifikasjonar_B3 <- kval_tidsserie %>% filter(progresjon == 1)
+  # kvalifikasjonar_B3 <- kvalifikasjonar_B3 %>% mutate(Z_kval_23 = scale(k2023)[,1])
+  # print(paste("rader kvalifikasjonar", kvalifikasjonar_B3 %>% names))
+  
+  # Bruk dbh_hent_orgdata() + dbh_add_programdata() for å få inn namn på studieprogram, institutt og fakultet
+  # Slå saman med denne og filtrer på "Tilbys til" == 99999 for å beholde aktive program
+  dbh_347 <- dbh_data(347, filter = c("Institusjonskode" = "1175"), group_by=c("Studieprogramkode", "Tilbys til"), variables =c("Studieprogramkode", "Tilbys til"))
+  
+  # dbh_707 har berre data for fulltidsstudium
+  dbh_707 <- dbh_data(707, filters = list("Institusjonskode"=c("1175", "257")))
+  # Tar med alle år
+  # normert_tid <- dbh_707 %>% group_by(Studieprogramkode, Årstall, Nivåkode) %>% 
+  #   summarise(Startkull = sum(Startkull), Normert = sum(`Fullført normert`)) %>% 
+  #   arrange(Nivåkode, Studieprogramkode, Årstall) %>% mutate(Andel_fullført = Normert/Startkull) 
+  
+  # Tar berre med nyaste registrerte år per program 
+  # normert_tid <- dbh_707 %>% group_by(Studieprogramkode, Årstall, Nivåkode) %>% 
+  #   summarise(Startkull = sum(Startkull), Normert = sum(`Fullført normert`)) %>% group_by(Studieprogramkode) %>% top_n(1, Årstall) %>% 
+  #   arrange(Nivåkode, Studieprogramkode, Årstall) %>% mutate(Andel_fullført = Normert/Startkull)
+  
+  # Utveksling
+  # OBS - denne blir feil om den grupperer på studieprogramkode
+  # TODO - kan sikkert gjere denne om til meir generisk kode for å legge til ekstra grupperingsvariablar i tillegg til dei DBH har valt ut
+  dbh_142_vars <- dbh_metadata(142) %>% filter(`Group by (forslag)` == "J") %>% select(`Variabel navn`)
+  dbh_142_vars <- dbh_142_vars[["Variabel navn"]]
+  dbh_142_vars <- append(dbh_142_vars, "Studieprogramkode")
+  dbh_142_vars <- append(dbh_142_vars, "Type")
+  dbh_142_vars <- append(dbh_142_vars, "Landkode")
+  dbh_142_vars <- append(dbh_142_vars, "Utvekslingsavtale")
+  dbh_142_vars <- append(dbh_142_vars, "Semester")
+  dbh_142 <- dbh_data(142, filters = c("Institusjonskode"="1175"), group_by = dbh_142_vars)
+  
+  # Lagar tabell med gjennomføringsandel per år
+  dbh_707 <- dbh_707 %>% filter(Årstall > 2017)
+  normert_tid <- dbh_707 %>% select(Studieprogramkode, Årstall, Nivå = Nivåkode, Startkull, 
+                                    Årstall_normert = `Årstall normert tid`, Normert_faktisk = `Fullført normert`) %>%
+    group_by(Studieprogramkode, Årstall_normert) %>% 
+    summarise(Startkull = sum(Startkull), Normert_faktisk = sum(Normert_faktisk)) %>% 
+    mutate(Andel_fullført = Normert_faktisk/Startkull) %>% select(-Startkull, -Normert_faktisk) %>% 
+    pivot_wider(names_from = Årstall_normert, 
+                values_from = c(Andel_fullført), names_prefix = "f", 
+                values_fn = {sum}, names_sort = T)
+  
+  # Alternativ, iallfall for det som ikkje er BA/MA:
+  # Bruke gjennomføring etter utdanningsplan - studiepoeng produsert
+  # Pluss: Ser ut til å dekke alle typar utdanning.
+  # Kan samanliknast på tvers, sidan det er ein proporsjon
+  # dbh_335 <- dbh_data(335, 
+  # filters = c("Institusjonskode"="1175"), 
+  # group_by=c("Avdelingskode", "Nivåkode", "Studiepoeng", "Studieprogramkode", "Årstall"))
+  # dbh_335 %>% filter(Årstall == 2022) %>% group_by(Nivåkode, Studieprogramkode) %>% 
+  #   mutate(prosent_gj = sp_gjennomfort/sp_planlagt*100) %>% 
+  #   arrange(Avdelingskode, Nivåkode, Studieprogramkode)
+  
+  dbh_104 <- dbh_data(104, filters = list("Institusjonskode"=c("1175", "257")), 
+                      group_by = c("Andel av heltid", "Andel praksis", "Avdelingskode", 
+                                   "Institusjonskode", "Nivåkode", "Organisering_kode", 
+                                   "Studiepoeng", "Studieprogramkode", "Årstall"))
+  
+  # Lagar tabell med kandidatar fordelt på år
+  # TODO mutate med snitt for siste tre år
+  dbh_104 <- dbh_104 %>% filter(Årstall > 2018) %>% group_by(Studieprogramkode, Årstall) %>% 
+    summarise(Total = sum(`Antall totalt`)) %>% 
+    group_by(Studieprogramkode) %>% 
+    pivot_wider(names_from = Årstall, values_from = Total, names_prefix = "k") %>% 
+    mutate(ksnitt = rowMeans(across(2:4), na.rm=T))
+  
+  # Kan slå saman tre år og rekne snitt/Z på det
+  # SB20_22 <- bind_rows(SB22 %>% select(studprog_kod, indx_laerutb10) %>% mutate(år = 2022), SB21 %>% select(studprog_kod, indx_laerutb10) %>% mutate(år = 2021))
+  # SB20_22 <- bind_rows(SB20_22, SB20 %>% select(studprog_kod, indx_laerutb10) %>% mutate(år = 2020))
+  
+  SB22 <- SB_prepare_2023("../datafiler/studiebarometeret/SB2022_Rådata.xlsx", 2022, 1175, kopleprogramdata = F)
+  SB22 <- SB22 %>% rename(any_of(c(progresjon == "Andel av heltid", Nivå = "Nivåkode"))) %>% 
+    filter(progresjon == 1, Nivå == "B3")
+  SB_LUB22 <- SB22 %>% rename("Studieprogramkode" = "studprog_kod")
+  SB_LUB22 <- SB_LUB22 %>% group_by(Studieprogramkode) %>% summarise(indx_LUB_22 = mean(indx_laerutb10, na.rm = T))
+  SB_LUB22 <- SB_LUB22 %>% mutate(Z_LUB_22 = scale(indx_LUB_22)[,1])
+  
+  # SB_LUB22 <- left_join(SB_LUB22,
+  #                       SB22 %>% select(Studieprogramkode, fakultet, Nivå, Institutt) %>% unique, 
+  #                       by = "Studieprogramkode")
+  # print(paste("rader SB_LUB", SB_LUB22 %>% names))
+  
+  SA23 <- SA_prepare_2023("../datafiler/sisteårs/Sisteårs2023.xlsx", 2023, 1175)
+  SA23 <- SA23 %>% filter(progresjon == 1, Nivå == "Bachelor")
+  SA_sosial23 <- SA23 %>% group_by(Studieprogramkode) %>% 
+    summarise(indx_sos_23 = mean(hvor_fornoyd_er_du_med_folgende_forhold_i_studieprogrammet_ditt_det_sosiale_miljoet_blant_studentene, na.rm = T))
+  SA_sosial23 <- SA_sosial23 %>% mutate(Z_sosial_23 = scale(indx_sos_23)[,1])
+  # print(paste("rader SA_sos", SA_sosial23 %>% names))
+  
+  KUserie <- OM_compile_kandidat_data_2022("../datafiler/kandidat/2022_nyenavn/", "2022")
+  # KU22 <- KUserie %>% filter(progresjon == 1, Nivå == "Bachelor")
+  KU_relevantarbeid22 <- KU22 %>% group_by(Studieprogramkode) %>% 
+    summarise(indx_relevantarbeid_22 = mean(arbeider_utdannet_til, na.rm = T))
+  KU_relevantarbeid22 <- KU_relevantarbeid22 %>% mutate(Z_relevantarbeid_23 = scale(indx_relevantarbeid_22)[,1])
+  # print(paste("rader KU_relevantarbeid", KU_relevantarbeid22 %>% names))
+
+  poenggrense_B3_23 <- read_excel("../../Studieportefølje/Poenggrenser opptak SO 2020–2023.xlsx", skip = 2)
+  poenggrense_B3_23 <- poenggrense_B3_23 %>% rename(Studieprogramkode = STUDIEPROGRAMKODE)
+  poenggrense_B3_23 <- poenggrense_B3_23 %>% mutate(`2023H_ORD` = case_when(
+    `2023H_ORD` == -2 ~ NA,
+    `2023H_ORD` == -1 ~ NA,
+    T ~ `2023H_ORD`
+  ))
+  poenggrense_B3_23 <- poenggrense_B3_23 %>% mutate(Z_poeng_23 = scale(`2023H_ORD`)[,1])
+  poenggrense_B3_23 <- poenggrense_B3_23 %>% select(-FAKULTET, -STUDIEPROGNAVN)
+  
+  indikator23_bachelor <- full_join(SB_LUB22, kvalifikasjonar_B3, "Studieprogramkode") 
+  print(paste("rader 1. join", indikator23_bachelor %>% nrow))
+  print(indikator23_bachelor %>% names)
+  indikator23_bachelor <- full_join(indikator23_bachelor, SA_sosial23, "Studieprogramkode")
+  print(paste("rader 2. join", indikator23_bachelor %>% nrow))
+  print(indikator23_bachelor %>% names)
+  indikator23_bachelor <- full_join(indikator23_bachelor, KU_relevantarbeid22, "Studieprogramkode")
+  print(paste("rader 3. join", indikator23_bachelor %>% nrow))
+  print(indikator23_bachelor %>% names)
+  indikator23_bachelor <- full_join(indikator23_bachelor, poenggrense_B3_23, "Studieprogramkode")
+  print(paste("rader 4. join", indikator23_bachelor %>% nrow))
+  print(indikator23_bachelor %>% names)
+  
+  # Snitt Indikator A
+  indikator23_bachelor <- indikator23_bachelor %>% 
+    mutate(Indikator_A = rowMeans(across(c(Z_kval_23, Z_LUB_22, Z_sosial_23)), na.rm = T))
+  
+  # Snitt Indikator B
+  indikator23_bachelor <- indikator23_bachelor %>% 
+    mutate(Indikator_B = rowMeans(across(c(Z_relevantarbeid_23, Z_poeng_23)), na.rm = T))
+  
+  # Legg til programvariablar
+  # indikator23_bachelor <- dbh_add_programdata(indikator23_bachelor, "Studieprogramkode", "1175")
+  # indikator23_bachelor <- OM_add_programdata(indikator23_bachelor, "Studieprogramkode")
+  # # indikator23_bachelor <- SB_add_nivå(indikator23_bachelor)
+  indikator23_bachelor <- indikator23_bachelor %>% filter(progresjon == 1, Nivåkode == "B3")
+  
+  # Bolk A vil være basert på 4 indikatorer som vektes likt:
+  #   -	Kandidattall 
+  # -	Gjennomføring 
+  # -	Et mål for faglig utbytte (indeks, men usikker på hvilken, helst ikke generell tilfredshet, studiebarometeret og sisteårsstudenten) 
+  # -	Et mål for sosial trivsel (se over, studiebarometeret og sisteårsstudenten)
+  
+  # Bolk B som vi gjerne vil at skal ses i sammenheng med del A har to indikatorer som vektes likt:
+  #   -	Andel i relevant jobb
+  # -	Inntakssnitt (mål på inntakskvalitet) Poenggrense? 
+  # 
+  return(indikator23_bachelor)
+}
+
 # Hente Sisteårsdata
 portefolje_prep_sistears <- function() {
   SA20 <- read_excel("C:\\Users\\kyrremat\\OneDrive - OsloMet\\Dokumenter\\Studieportefølje\\Sisteårs\\Sisteårs2020.xlsx")
@@ -38,36 +348,31 @@ prep_uteksaminerte <- function(datafil = "../../Studieportefølje/Uteksaminerte 
 ##* Lagar alle delsetta som trengst og slår dei saman
 ferdige_kvalifikasjonar <- function() {
   # årsstudium
-  ar_fulltid_2022 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/årsstudium_høgskulekandidat/Årsstudium oppstart 2020 - ferdig 2022.xlsx", ferdig_ar = "2022", inn_progresjon = 1)
-  ar_fulltid_2021 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/årsstudium_høgskulekandidat/Årsstudium oppstart 2019 - ferdig 2021.xlsx", ferdig_ar = "2021", inn_progresjon = 1)
-  ar_fulltid_2020 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/årsstudium_høgskulekandidat/Årsstudium oppstart 2018 - ferdig 2020.xlsx", ferdig_ar = "2020", inn_progresjon = 1)
-  # 4 Årsstudium oppstart 2018 - ferdig 2020.xlsx      
-  # 5 Årsstudium oppstart 2019 - ferdig 2021.xlsx      
-  # 6 Årsstudium oppstart 2020 - ferdig 2022.xlsx  
+  ar_fulltid_2022 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/årsstudium_høgskulekandidat/Årsstudium oppstart 2020 - ferdig 2022.xlsx", ferdig_ar = "k2022", inn_progresjon = 1)
+  ar_fulltid_2021 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/årsstudium_høgskulekandidat/Årsstudium oppstart 2019 - ferdig 2021.xlsx", ferdig_ar = "k2021", inn_progresjon = 1)
+  ar_fulltid_2020 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/årsstudium_høgskulekandidat/Årsstudium oppstart 2018 - ferdig 2020.xlsx", ferdig_ar = "k2020", inn_progresjon = 1)
   
   # høgskulekandidat
-  hk_fulltid_2022 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/årsstudium_høgskulekandidat/Høgskulekandidat oppstart 2019 - ferdig 2022.xlsx", ferdig_ar = "2022", inn_progresjon = 1)
-  hk_fulltid_2021 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/årsstudium_høgskulekandidat/Høgskulekandidat oppstart 2018 - ferdig 2021.xlsx", ferdig_ar = "2021", inn_progresjon = 1)
-  hk_fulltid_2020 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/årsstudium_høgskulekandidat/Høgskulekandidat oppstart 2017 - ferdig 2020.xlsx", ferdig_ar = "2020", inn_progresjon = 1)
-  # 1 Høgskulekandidat oppstart 2017 - ferdig 2020.xlsx
-  # 2 Høgskulekandidat oppstart 2018 - ferdig 2021.xlsx
-  # 3 Høgskulekandidat oppstart 2019 - ferdig 2022.xlsx
+  hk_fulltid_2022 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/årsstudium_høgskulekandidat/Høgskulekandidat oppstart 2019 - ferdig 2022.xlsx", ferdig_ar = "k2022", inn_progresjon = 1)
+  hk_fulltid_2021 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/årsstudium_høgskulekandidat/Høgskulekandidat oppstart 2018 - ferdig 2021.xlsx", ferdig_ar = "k2021", inn_progresjon = 1)
+  hk_fulltid_2020 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/årsstudium_høgskulekandidat/Høgskulekandidat oppstart 2017 - ferdig 2020.xlsx", ferdig_ar = "k2020", inn_progresjon = 1)
   
   # bachelor
   # fulltid år ferdig
-  ba_fulltid_2022 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/bachelor/Bachelor oppstart 2018 - ferdig 2022.xlsx", ferdig_ar = "2022", inn_progresjon = 1)
-  ba_fulltid_2021 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/bachelor/Bachelor oppstart 2017 - ferdig 2021 - ferdig 2022 (trekvart).xlsx", ferdig_ar = "2021", inn_progresjon = 1)
-  ba_fulltid_2020 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/bachelor/Bachelor oppstart 2016 - ferdig 2020 (fulltid) - ferdig 2021 (trekvart).xlsx", ferdig_ar = "2020", inn_progresjon = 1)
+  ba_fulltid_2023 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/bachelor/Bachelor oppstart 2019 - ferdig 2023.xlsx", ferdig_ar = "k2023", inn_progresjon = 1)
+  ba_fulltid_2022 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/bachelor/Bachelor oppstart 2018 - ferdig 2022.xlsx", ferdig_ar = "k2022", inn_progresjon = 1)
+  ba_fulltid_2021 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/bachelor/Bachelor oppstart 2017 - ferdig 2021 - ferdig 2022 (trekvart).xlsx", ferdig_ar = "k2021", inn_progresjon = 1)
+  ba_fulltid_2020 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/bachelor/Bachelor oppstart 2016 - ferdig 2020 (fulltid) - ferdig 2021 (trekvart).xlsx", ferdig_ar = "k2020", inn_progresjon = 1)
     
   # ba trekvart år ferdig
-  ba_trekvart_2022 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/bachelor/Bachelor oppstart 2017 - ferdig 2021 - ferdig 2022 (trekvart).xlsx", ferdig_ar = "2022", inn_progresjon = 0.75)
-  ba_trekvart_2021 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/bachelor/Bachelor oppstart 2016 - ferdig 2020 (fulltid) - ferdig 2021 (trekvart).xlsx", ferdig_ar = "2021", inn_progresjon = 0.75)
-  ba_trekvart_2020 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/bachelor/Bachelor oppstart 2015 - ferdig 2020 (trekvart) - ferdig 2022 (halvfart).xlsx", ferdig_ar = "2020", inn_progresjon = 0.75)
+  ba_trekvart_2022 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/bachelor/Bachelor oppstart 2017 - ferdig 2021 - ferdig 2022 (trekvart).xlsx", ferdig_ar = "k2022", inn_progresjon = 0.75)
+  ba_trekvart_2021 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/bachelor/Bachelor oppstart 2016 - ferdig 2020 (fulltid) - ferdig 2021 (trekvart).xlsx", ferdig_ar = "k2021", inn_progresjon = 0.75)
+  ba_trekvart_2020 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/bachelor/Bachelor oppstart 2015 - ferdig 2020 (trekvart) - ferdig 2022 (halvfart).xlsx", ferdig_ar = "k2020", inn_progresjon = 0.75)
     
   # ba halvfart år ferdig
-  ba_halvfart_2022 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/bachelor/Bachelor oppstart 2015 - ferdig 2020 (trekvart) - ferdig 2022 (halvfart).xlsx", ferdig_ar = "2022", inn_progresjon = 0.5)
-  ba_halvfart_2021 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/bachelor/Bachelor oppstart 2014 - ferdig 2021 (halvfart).xlsx",  ferdig_ar = "2021", inn_progresjon = 0.5)
-  ba_halvfart_2020 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/bachelor/Bachelor oppstart 2013 - ferdig 2020 (halvfart).xlsx", ferdig_ar = "2020", inn_progresjon = 0.5)
+  ba_halvfart_2022 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/bachelor/Bachelor oppstart 2015 - ferdig 2020 (trekvart) - ferdig 2022 (halvfart).xlsx", ferdig_ar = "k2022", inn_progresjon = 0.5)
+  ba_halvfart_2021 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/bachelor/Bachelor oppstart 2014 - ferdig 2021 (halvfart).xlsx",  ferdig_ar = "k2021", inn_progresjon = 0.5)
+  ba_halvfart_2020 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/bachelor/Bachelor oppstart 2013 - ferdig 2020 (halvfart).xlsx", ferdig_ar = "k2020", inn_progresjon = 0.5)
   
   # [1] "Bachelor oppstart 2013 - ferdig 2020 (halvfart).xlsx"                         
   # [2] "Bachelor oppstart 2014 - ferdig 2021 (halvfart).xlsx"                         
@@ -77,19 +382,19 @@ ferdige_kvalifikasjonar <- function() {
   # [6] "Bachelor oppstart 2018 - ferdig 2022.xlsx" 
   
   # master
-  ma_fulltid_2022 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/master/Master oppstart 2019 - ferdig 2022.xlsx", ferdig_ar = "2022", inn_progresjon = 1)
-  ma_fulltid_2021 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/master/Master oppstart 2018 - ferdig 2021 (fulltid) - ferdig 2022 (totredel).xlsx", ferdig_ar = "2021", inn_progresjon = 1)
-  ma_fulltid_2020 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/master/Master oppstart 2017 - ferdig 2020 (fulltid) - ferdig 2021 (totredel) - ferdig 2022 (halvfart).xlsx", ferdig_ar = "2020", inn_progresjon = 1)
+  ma_fulltid_2022 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/master/Master oppstart 2019 - ferdig 2022.xlsx", ferdig_ar = "k2022", inn_progresjon = 1)
+  ma_fulltid_2021 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/master/Master oppstart 2018 - ferdig 2021 (fulltid) - ferdig 2022 (totredel).xlsx", ferdig_ar = "k2021", inn_progresjon = 1)
+  ma_fulltid_2020 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/master/Master oppstart 2017 - ferdig 2020 (fulltid) - ferdig 2021 (totredel) - ferdig 2022 (halvfart).xlsx", ferdig_ar = "k2020", inn_progresjon = 1)
   
   # ma totredel år ferdig
-  ma_totredel_2022 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/master/Master oppstart 2018 - ferdig 2021 (fulltid) - ferdig 2022 (totredel).xlsx", ferdig_ar = "2022", inn_progresjon = 0.67)
-  ma_totredel_2021 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/master/Master oppstart 2017 - ferdig 2020 (fulltid) - ferdig 2021 (totredel) - ferdig 2022 (halvfart).xlsx", ferdig_ar = "2021", inn_progresjon = 0.67)
-  ma_totredel_2020 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/master/Master oppstart 2016 - ferdig 2020 (totredel) - ferdig 2021 (halvfart).xlsx", ferdig_ar = "2020", inn_progresjon = 0.67)
+  ma_totredel_2022 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/master/Master oppstart 2018 - ferdig 2021 (fulltid) - ferdig 2022 (totredel).xlsx", ferdig_ar = "k2022", inn_progresjon = 0.67)
+  ma_totredel_2021 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/master/Master oppstart 2017 - ferdig 2020 (fulltid) - ferdig 2021 (totredel) - ferdig 2022 (halvfart).xlsx", ferdig_ar = "k2021", inn_progresjon = 0.67)
+  ma_totredel_2020 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/master/Master oppstart 2016 - ferdig 2020 (totredel) - ferdig 2021 (halvfart).xlsx", ferdig_ar = "k2020", inn_progresjon = 0.67)
   
   # ma halvfart år ferdig
-  ma_halvfart_2022 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/master/Master oppstart 2017 - ferdig 2020 (fulltid) - ferdig 2021 (totredel) - ferdig 2022 (halvfart).xlsx", ferdig_ar = "2022", inn_progresjon = 0.5)
-  ma_halvfart_2021 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/master/Master oppstart 2016 - ferdig 2020 (totredel) - ferdig 2021 (halvfart).xlsx", ferdig_ar = "2021", inn_progresjon = 0.5)
-  ma_halvfart_2020 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/master/Master oppstart 2015 - ferdig 2020 (halvfart).xlsx", ferdig_ar = "2020", inn_progresjon = 0.5)
+  ma_halvfart_2022 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/master/Master oppstart 2017 - ferdig 2020 (fulltid) - ferdig 2021 (totredel) - ferdig 2022 (halvfart).xlsx", ferdig_ar = "k2022", inn_progresjon = 0.5)
+  ma_halvfart_2021 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/master/Master oppstart 2016 - ferdig 2020 (totredel) - ferdig 2021 (halvfart).xlsx", ferdig_ar = "k2021", inn_progresjon = 0.5)
+  ma_halvfart_2020 <- ferdig_kvalifikasjon("../../Studieportefølje/Gjennomføring/master/Master oppstart 2015 - ferdig 2020 (halvfart).xlsx", ferdig_ar = "k2020", inn_progresjon = 0.5)
   
   # [1] "Master oppstart 2015 - ferdig 2020 (halvfart).xlsx"                                                 
   # [2] "Master oppstart 2016 - ferdig 2020 (totredel) - ferdig 2021 (halvfart).xlsx"                        
@@ -98,21 +403,28 @@ ferdige_kvalifikasjonar <- function() {
   # [5] "Master oppstart 2019 - ferdig 2022.xlsx"
   
   # Slår saman alle dei tre åra som rader og så som kolonner
+  kvalifikasjoner_2023 <- bind_rows(ba_fulltid_2023) %>%
+    select(Studieprogramkode, Studieprogram, progresjon, Nivåkode, "k2023")
   kvalifikasjoner_2022 <- bind_rows(ar_fulltid_2022, hk_fulltid_2022,
                                     ba_fulltid_2022, ba_trekvart_2022, ba_halvfart_2022, 
                                     ma_fulltid_2022, ma_totredel_2022, ma_halvfart_2022) %>%
-    select(Studieprogramkode, Studieprogram, progresjon, Nivåkode, "2022")
+    select(Studieprogramkode, Studieprogram, progresjon, Nivåkode, "k2022")
   kvalifikasjoner_2021 <- bind_rows(ar_fulltid_2021, hk_fulltid_2021,
                                     ba_fulltid_2021, ba_trekvart_2021, ba_halvfart_2021, 
                                     ma_fulltid_2021, ma_totredel_2021, ma_halvfart_2021) %>%
-    select(Studieprogramkode, Studieprogram, progresjon, Nivåkode, "2021")
+    select(Studieprogramkode, Studieprogram, progresjon, Nivåkode, "k2021")
   kvalifikasjoner_2020 <- bind_rows(ar_fulltid_2020, hk_fulltid_2020,
                                     ba_fulltid_2020, ba_trekvart_2020, ba_halvfart_2020, 
                                     ma_fulltid_2020, ma_totredel_2020, ma_halvfart_2020) %>% 
-    select(Studieprogramkode, Studieprogram, progresjon, Nivåkode, "2020")
+    select(Studieprogramkode, Studieprogram, progresjon, Nivåkode, "k2020")
   
   kvalifikasjoner_full <- full_join(kvalifikasjoner_2020, kvalifikasjoner_2021)
   kvalifikasjoner_full <- full_join(kvalifikasjoner_full, kvalifikasjoner_2022)
+  kvalifikasjoner_full <- full_join(kvalifikasjoner_full, kvalifikasjoner_2023)
+  
+  kvalifikasjoner_full <- kvalifikasjoner_full %>% 
+    mutate(across(starts_with("k20"), ~as.numeric(gsub(",",".", .))))
+  
   return(kvalifikasjoner_full)
 }
 
@@ -174,6 +486,7 @@ ferdig_kvalifikasjon <- function(filnamn, ferdig_ar, inn_progresjon, skriv_test 
   feil_linjer <- inndata %>% filter(is.na(pluss_2_sem) | pluss_2_sem < pluss_1_sem)
   if (feil_linjer %>% nrow > 0) print(feil_linjer)
   
+  # Bytt ut med pluss_1_sem
   inndata <- inndata %>% rename(!!ferdig_ar := pluss_2_sem)  
   
   if (skriv_test) inndata %>% select(-1) %>% print

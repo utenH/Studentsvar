@@ -47,7 +47,7 @@ SB_prepare_2022 <- function(innfil, dataår, instnr) {
 } 
 
 ##* Studiebarometeret
-SB_prepare_2023 <- function(innfil, dataår, instnr) {
+SB_prepare_2023 <- function(innfil, dataår, instnr, kopleprogramdata = T) {
   OM <- read_excel(innfil)
   OM <- OM %>% mutate(undersøkelse_år = dataår)
   # I 2022 inneheldt datasettet nokre observasjonar utan studprog_kod/studiepgm_navn
@@ -55,13 +55,15 @@ SB_prepare_2023 <- function(innfil, dataår, instnr) {
   OM <- OM %>% filter(!is.na(studprog_kod))
   OM[OM==9999] <- NaN # Var NA, bytta 2020 for å skilje mellom ikkje-svar (NA) og Vet ikke (NaN)
   OM <- SB_name_fak_kort(OM)
-  if (instnr == 1175) {
-    # legg til programnamn med instituttilhøyrigheit
-    OM <- dbh_add_programdata(OM, "studprog_kod", instnr)
-    OM <- OM_add_programdata(OM, "Studieprogramkode")
-    OM <- SB_add_nivå(OM)
-  } else {
-    OM <- dbh_add_programdata(OM, "studprog_kod", instnr)
+  if (kopleprogramdata) {
+    if (instnr == 1175) {
+      # legg til programnamn med instituttilhøyrigheit
+      OM <- dbh_add_programdata(OM, "studprog_kod", instnr)
+      OM <- OM_add_programdata(OM, "Studieprogramkode")
+      OM <- SB_add_nivå(OM)
+    } else {
+      OM <- dbh_add_programdata(OM, "studprog_kod", instnr)
+    }
   }
   OM <- SB_add_sum_tid(OM)
   OM <- SB_prep_indeks(OM)
@@ -180,6 +182,29 @@ SA_tilpassdata <- function(sdf) {
 ##* DBH-funksjonar 
 library(rdbhapi)
 
+##**
+##* Hjelpefunksjon for å skrive ut metadata om tabell
+##* 
+dbh_skriv_meta <- function(tabellnummer) {
+  dbh_metadata(tabellnummer) %>% select(`Variabel navn`, `Group by (forslag)`, Kommentar) %>% print(n=Inf)
+} 
+
+##*
+##* Hjelpefunksjon for å få med alle anbefalte grupperingsvariablar + dei ein vel sjølv
+##* tablenum tabellnummer
+##* vars_to_add string vector med variablar å legge til
+##* institusjonskode string (vector) med institusjonsnummer å hente (bruk enkelt-sitatteikn)
+##* år kan til dømes filtrere på større enn: år = c('greaterthan', '2019')
+dbh_custom_data <- function(tablenum, vars_to_add, institusjonskode = "1175", år = c('top', '3')) {
+  dbh_vars <- dbh_metadata(tablenum) %>% filter(`Group by (forslag)` == "J") %>% select(`Variabel navn`)
+  dbh_vars <- dbh_vars[["Variabel navn"]]
+  dbh_vars <- append(dbh_vars, vars_to_add)
+  dbh_table <- dbh_data(tablenum, 
+                        filters = list("Institusjonskode" = institusjonskode, "Årstall" = år), 
+                        group_by = dbh_vars)
+  return(dbh_table)
+}
+
 # Slår saman på programkode, for å legge til programdata frå DBH
 # sdf - dataframe å slå saman med
 # varnamn - variabel i sdf for programkode
@@ -225,25 +250,71 @@ dbh_add_programnavn <- function(sdf, varnamn) {
 
 ##**
 ##* Hentar data frå DBH, til å slå saman med andre datasett 
-dbh_hent_programdata <- function(instnr = "1175") {
+dbh_hent_programdata <- function(instnr = 1175) {
   dbh_vars <- c("Studieprogramkode", 
                 "Studieprogramnavn",
                 "Avdelingskode",
                 "Nivåkode", 
                 "Årstall", 
                 "Andel av heltid", 
-                "Andel praksis")
+                "Andel praksis",
+                "Tilbys til")
   dbh_programdata <- dbh_data(347, 
                               filters = c("Institusjonskode" = instnr), 
                               variables = dbh_vars, 
                               group_by = dbh_vars) %>%
-    arrange(desc(Årstall)) %>% distinct(Studieprogramkode, .keep_all = T) 
-  dbh_programdata <- left_join(dbh_programdata, dbh_hent_orgdata(instnr), "Avdelingskode")
+    arrange(desc(Årstall)) %>% distinct(Studieprogramkode, .keep_all = T)
+  
+  # For å handtere samanslåing av institutt
+  if (instnr == 1175) {
+    dbh_programdata <- dbh_programdata %>% mutate(Avdelingskode = 
+                                                    case_when(Avdelingskode == "510330" | 
+                                                                Avdelingskode == "510340" ~ "510350",
+                                                              TRUE ~ Avdelingskode))
+  }  
+  dbh_orgdata <- dbh_hent_orgdata(instnr) %>% filter(!grepl("studieprogram på instituttnivå", Institutt))
+  dbh_programdata <- left_join(dbh_programdata, dbh_orgdata, "Avdelingskode")
+  
+  # For å handtere samanslåing av institutt og særtilfelle
+  if (instnr == 1175) {
+    # Handtere program som ikkje er knytt til institutt
+    dbh_programdata <- dbh_programdata %>% 
+      mutate(Fakultetskode = coalesce(Fakultetskode, strtrim(Avdelingskode, 3)))
+    
+    dbh_programdata <- dbh_programdata %>% mutate(Avdelingskode = 
+                            case_when(Avdelingskode == "510330" | 
+                                        Avdelingskode == "510340" ~ "510350",
+                                      TRUE ~ Avdelingskode))
+    
+    dbh_programdata <- dbh_programdata %>% mutate(Institutt = 
+                            case_when(Institutt == "Institutt for fysioterapi" | 
+                                        Institutt == "Institutt for ergoterapi og ortopediingeniørfag" ~ 
+                                        "Institutt for rehabiliteringsvitenskap og helseteknologi",
+                                      Avdelingskode == "530360" ~ "School of Management",
+                                      Avdelingskode == "540360" ~ "Makerspace",
+                                      is.na(Institutt) ~ "Uplassert",
+                                      TRUE ~ Institutt))
+    
+    dbh_programdata <- dbh_programdata %>% mutate(Fakultetsnavn = case_when(
+      grepl("510", Fakultetskode) ~ "HV",
+      grepl("520", Fakultetskode) ~ "LUI",
+      grepl("530", Fakultetskode) ~ "SAM",
+      grepl("540", Fakultetskode) ~ "TKD",
+      grepl("620", Fakultetskode) ~ "SPS",
+      grepl("000", Fakultetskode) ~ "OsloMet"
+    ))
+    
+    dbh_programdata <- dbh_programdata %>% mutate(Avdelingskode = 
+                                                    case_when(Avdelingskode == "510330" | 
+                                                                Avdelingskode == "510340" ~ "510350",
+                                                              TRUE ~ Avdelingskode))
+  }
+  
   return(dbh_programdata)
 }
 
 ##** Hentar ein tabell med instituttnamn, kan koplast på kolonna Avdelingskode 
-dbh_hent_orgdata <- function(instnr) {
+dbh_hent_orgdata <- function(instnr = 1175) {
   sdf <- dbh_data(457, filters = c("Institusjonskode" = instnr, "Årstall" = "2023"), 
                   variables = c("Avdelingskode", "Avdelingskode_SSB", "Avdelingsnavn", "Årstall"), 
                   group_by = c("Avdelingskode", "Avdelingskode_SSB", "Avdelingsnavn", "Årstall")) %>% 
@@ -253,28 +324,27 @@ dbh_hent_orgdata <- function(instnr) {
     mutate(Fakultetskode = strtrim(Avdelingskode, 3)) %>% 
     arrange(Avdelingsnavn) %>% select(Avdelingskode, Avdelingskode_SSB, Fakultetskode, Institutt = Avdelingsnavn)
   
+  # For å handtere samanslåing av institutt
   if (instnr == 1175) {
-    sdf <- sdf %>% mutate(Institutt = 
-                            case_when(Institutt == "Institutt for fysioterapi" | 
-                                        Institutt == "Institutt for ergoterapi og ortopediingeniørfag" ~ 
-                                        "Institutt for rehabiliteringsvitenskap og helseteknologi",
-                                      TRUE ~ Institutt))
+    sdf <- sdf %>% mutate(Avdelingskode = 
+                            case_when(Avdelingskode == "510330" | 
+                                        Avdelingskode == "510340" ~ "510350",
+                                      TRUE ~ Avdelingskode))
   }
   
   # Hentar tabell med fakultetskode og -namn
-  # TODO - dei programma som er tilknytt fakultet på høgste nivå, fell utanom her - forsøk å fikse
   dbh_210 <- dbh_data(210) %>% filter(Institusjonskode == instnr) %>%
     select(Fakultetskode, Fakultetsnavn) %>% unique() %>% arrange(Fakultetskode)
   
-  # Forkorte fakultetsnamn
-  if (instnr == 1175) {
-    dbh_210 <- dbh_210 %>% mutate(Fakultetsnavn = case_when(
-      grepl("HV", Fakultetsnavn) ~ "HV",
-      grepl("LUI", Fakultetsnavn) ~ "LUI",
-      grepl("SAM", Fakultetsnavn) ~ "SAM",
-      grepl("TKD", Fakultetsnavn) ~ "TKD"
-    ))
-  }
+  # Forkorte fakultetsnamn - flytta til dbh_hent_programdata()
+  # if (instnr == 1175) {
+  #   dbh_210 <- dbh_210 %>% mutate(Fakultetsnavn = case_when(
+  #     grepl("HV", Fakultetsnavn) ~ "HV",
+  #     grepl("LUI", Fakultetsnavn) ~ "LUI",
+  #     grepl("SAM", Fakultetsnavn) ~ "SAM",
+  #     grepl("TKD", Fakultetsnavn) ~ "TKD"
+  #   ))
+  # }
   
   # Slår saman tabellane for å få med fakultetsnamn
   sdf <- left_join(sdf, dbh_210, by = "Fakultetskode")
@@ -359,6 +429,29 @@ dbh_hent_studiepoengdata <- function(institusjonsnummer) {
   return(sdf)
 }
 
+##** 
+##* Kodar om Studieprogramkode, for å kunne vise eldre data saman med nytt program
+##* vis_samla_kode gir moglegheit til å velje å vise berre nyaste studieprogramkode, eller samanslått
+##* 
+kople_studieprogramkode <- function(sdf, vis_samla_kode = T) {
+  if (vis_samla_kode) {
+    sdf <- sdf %>% 
+      mutate(Studieprogramkode = case_when(
+        Studieprogramkode == "SYKK" ~ "SYKK+SPH", 
+        Studieprogramkode == "SPH" ~ "SYKK+SPH",
+        Studieprogramkode == "SYKP" ~ "SYKP+SYPLGR", 
+        Studieprogramkode == "SYPLGR" ~ "SYKP+SYPLGR",
+        TRUE ~ Studieprogramkode))
+  }
+  if (!vis_samla_kode) {
+    sdf <- sdf %>% 
+      mutate(Studieprogramkode = case_when(
+        Studieprogramkode == "SPH" ~ "SYKK",
+        Studieprogramkode == "SYPLGR" ~ "SYKP",
+        TRUE ~ Studieprogramkode))
+  }
+  return(sdf)
+}
 ##**
 ##* Funksjon for å hente inn programdata frå excelfil
 ##* sdf - dataframe som skal utvidast
@@ -377,7 +470,7 @@ OM_add_programdata <- function(sdf, varnamn) {
   sdf <- sdf %>% rename("Studieprogramkode" = !!varnamn)
   
   # Om det er Studiebarometerdata, kan vi skilje mellom 2. og 5. år på grunnskulelærarutdanninga
-  if ("STUDIEAR" %in% (dbh_program_OM %>% names)) {
+  if ("STUDIEAR" %in% (sdf %>% names)) {
     sdf <- sdf %>% mutate(Studieprogram_instnamn = case_when(
       grepl("GLU", Studieprogramkode) ~ paste0(Studieprogram_instnamn, " (", STUDIEAR, ". studieår)"),
       T ~ Studieprogram_instnamn
