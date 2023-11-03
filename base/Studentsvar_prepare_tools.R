@@ -258,7 +258,8 @@ dbh_hent_programdata <- function(instnr = 1175) {
                 "Årstall", 
                 "Andel av heltid", 
                 "Andel praksis",
-                "Tilbys til")
+                "Tilbys til",
+                "Studiepoeng")
   dbh_programdata <- dbh_data(347, 
                               filters = c("Institusjonskode" = instnr), 
                               variables = dbh_vars, 
@@ -1420,6 +1421,14 @@ SB_name_fak_kort <- function(sdf) {
 ##* Generiske funksjonar for omkoding av variablar
 ##* 
 
+# Kodar om til faktor, med gitte nivå
+OM_lag_faktor <- function(sdf, variabel, nivå = NULL, sortert = F) {
+  sdf <- sdf %>% mutate({{variabel}} := factor({{variabel}},
+                                                 levels = nivå,
+                                               ordered = sortert))
+  return(sdf)
+}
+
 # Kodar om til faktor for å sikre at alle nivå blir med i utskrift
 OM_set_faktor <- function(sdf, svar) {
   sdf <- sdf %>% mutate({{svar}} := as.factor({{svar}}))
@@ -1515,6 +1524,22 @@ OM_svart_fire_eller_fem_bin <- function(innvariabel) {
     {{innvariabel}} != "" ~ NaN
   )
 }
+
+##** 
+##* Legg til variabel syklus, basert på nivåkode
+##* 
+OM_set_syklus <- function(sdf, nivåvariabel) {
+  sdf <- sdf %>% mutate(Syklus = case_when(
+    grepl("AR|HN|LN", {{nivåvariabel}}) ~ "Andre",
+    grepl("B3|B4|HK|YU", {{nivåvariabel}}) ~ "Bachelor",
+    grepl("M2|ME|M5", {{nivåvariabel}}) ~ "Master",
+    grepl("FU", {{nivåvariabel}}) ~ "Forskarutdanning",
+    grepl("VS", {{nivåvariabel}}) ~ "Vidaregåande skule-nivå",
+    T ~ NA
+  ))
+  return(sdf)
+}
+
 ##**
 ##* Til å lage binær variabel for dei to beste svaralternativa. 
 ##*
