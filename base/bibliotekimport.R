@@ -14,3 +14,5 @@ library(janitor)
 source("base/Studentsvar_prepare_tools.R", encoding = "UTF-8")
 # importer utskriftskode
 source("base/Studentsvar_report.R", encoding = "UTF-8")
+# importer studieoversiktskode
+source("base/Studieoversikt.R", encoding = "UTF-8")

@@ -7,12 +7,13 @@ options(dplyr.summarise.inform = FALSE)
 ##* Kan skrive til Word, Excel eller returnere datasett
 ##* Eitt ark/tabell per studiestad – fakultet – nivå, viser registrerte studentar og fullførte per program
 ##* 
-##* TODO: lage statistikk (til diagram) som viser 
-##* * totalt omfang utdanningar og studentar, fordelt på studiestad/fakultet/institutt/nivå
-##* * fordeling av andel av heltid, andel praksis fordelt på nivå og studiestad
-##* 
-##* # TODO - lag ein kommentar til utskrift om kva som er filtrert
-##* TODO: Vurdere om vi skal vise fram retningar i paraply på noko vis
+##* TODO: 
+##* * Vurdere om vi skal vise fram retningar i paraply på noko vis
+##* * Vurdere å lage noko ekstra på dei store, berande utdanningane
+##* * Kommentere VS-nivået, særleg mangelen på fullførttal på TRE
+##* * Vere heilt tydeleg på at det er tal på utdanningar som er vist i andel heiltid/praksis
+##* * Kommentere at MA-opptak i NOM er lærarutdanning?
+##* * Forklare skilnad på HN/LN
 ##* 
 SP_studietilbod_OM <- function(mal_fil = "Rapportfiler/Studieoversikt/Studieoversikt_mal.docx", ut_fil = NULL) {
   år_avgrensing_diagram <- 2018
@@ -23,6 +24,7 @@ SP_studietilbod_OM <- function(mal_fil = "Rapportfiler/Studieoversikt/Studieover
   #* Bygger tabellar til utskrift
   #*
   # Hentar alle studietilbod for å få variablar for studieprogram
+  print("Hentar DBH-data om alle studietilbod for å få variablar for studieprogram")
   studietilbod_dbh <- dbh_hent_programdata() %>% #filter(Årstall == år_no) %>% 
     # filter(Studieprogramkode != "SPH", Studieprogramkode != "SYPLGR") %>% 
     select(-Årstall, -Avdelingskode_SSB, -Avdelingskode, -Fakultetskode)
@@ -42,6 +44,7 @@ SP_studietilbod_OM <- function(mal_fil = "Rapportfiler/Studieoversikt/Studieover
   studietilbod <- studietilbod_dbh
   
   # Hentar stadnavn i 1. og 2. syklus
+  print("Hentar DBH-data om stadnavn i 1. og 2. syklus")
   studiestad_OM <- dbh_data(124, filters=c("Institusjonskode"="1175"), 
                              group_by=c("Stednavn campus", "Studieprogramkode", "Årstall")) %>%
     filter(Årstall == år_no) %>% select(Studieprogramkode, Studiestad = `Stednavn campus`) %>% unique()
@@ -52,12 +55,14 @@ SP_studietilbod_OM <- function(mal_fil = "Rapportfiler/Studieoversikt/Studieover
   studietilbod <- studietilbod %>% filter(Studiestad != "Sandvika" | is.na(Studiestad))
   
   # Hentar tal på møtte studentar i 1. og 2. syklus
+  print("Hentar DBH-data om møtte studentar i 1. og 2. syklus")
   nye_studentar_OM <- dbh_data(379, filters=c("Institusjonskode"="1175"), 
                                group_by=c("Studieprogramkode", "Årstall", "Semester")) %>% 
     # Tar bort desse: Søknadsalternativer, `Tilbud om opptak`, `Akseptert tilbud`
     select(Studieprogramkode, Årstall, Semester, Antall = `Møtt til studiestart` )
 
   # Hentar registrerte personar i 3. syklus
+  print("Hentar DBH-data om registrerte personar i 1. og 2. syklus")
   registrerte_OM_phd <- dbh_data(115, filters=c("Institusjonskode"="1175"), 
                                  group_by=c("Studieprogramkode", "Årstall", "Semester")) %>%
     rename("Antall" = "Antall totalt") %>%
@@ -82,12 +87,14 @@ SP_studietilbod_OM <- function(mal_fil = "Rapportfiler/Studieoversikt/Studieover
   # Slår saman med studieprogramvariablane
   studietilbod <- left_join(studietilbod, studentar_OM_pivot, "Studieprogramkode")
   
-  # Hentar data om fullførte studieprogram i 1. og 2. syklus
+  # Hentar data om fullførte studietibod i 1. og 2. syklus
+  print("Hentar DBH-data om fullførte studietilbod i 1. og 2. syklus")
   fullfort_OM <- dbh_data(118, filters=c("Institusjonskode"="1175"), 
                             group_by=c("Studieprogramkode", "Årstall", "Andel av heltid")) %>%
     rename("Antall" = "Antall totalt") 
   
   # Hentar personar i 3. syklus med avlagt avhandling
+  print("Hentar DBH-data om personar i 3. syklus med avlagt avhandling")
   fullfort_OM_phd <- dbh_data(101, filters=c("Institusjonskode"="1175"), 
                                  group_by=c("Studieprogramkode", "Årstall")) %>%
     rename("Antall" = "Antall totalt") %>%
@@ -110,8 +117,8 @@ SP_studietilbod_OM <- function(mal_fil = "Rapportfiler/Studieoversikt/Studieover
   # Slår saman med studieprogramvariablane
   studietilbod <- left_join(studietilbod, fullfort_OM_pivot, "Studieprogramkode")
   
-  # Endrar namn på kolonne frå "Studieprogramnavn" til "Studietilbud"
-  studietilbod <- studietilbod %>% rename("Studietilbud" = "Studieprogramnavn")
+  # Endrar namn på kolonne frå "Studieprogramnavn" til "Studietilbod"
+  studietilbod <- studietilbod %>% rename("Studietilbod" = "Studieprogramnavn")
   
   # TODO - skriv om til å bruke år_no og år_no - 1
   # Filtrerer bort linjer med lite nye data
@@ -130,16 +137,35 @@ SP_studietilbod_OM <- function(mal_fil = "Rapportfiler/Studieoversikt/Studieover
   
   #**
   #* Bygger tabellar til å lage overordna diagram
+  # print(getwd())
+  # print(rdbhapi:::.env$token)
+  # # print(Sys.getenv("dbhapi_sso_id"))
+  # # print(Sys.getenv("dbhapi_sso_secret"))
+  # print(rdbhapi:::.get_token())
+  # # print(rdbhapi:::.get_new_token(Sys.getenv("dbhapi_sso_id"), Sys.getenv("dbhapi_sso_secret")) )
   
+  # Teste for å sjå om små tal er med
+  # test_104 <- dbh_data(104, filters = list("Institusjonskode"=c("1175", "257")),
+  #          group_by = c("Andel av heltid", "Andel praksis", "Avdelingskode",
+  #                       "Institusjonskode", "Nivåkode", "Organisering_kode",
+  #                       "Studiepoeng", "Studieprogramkode", "Årstall")) %>%
+  #   filter(Årstall == 2022, Studieprogramkode == "MAERGD") %>%
+  #   select(Studieprogramkode, "Antall totalt")
+  # print(test_104)
+
+  # return()
   #** 
   #*Hentar registrerte studentar i 1. og 2. syklus
+  print("Hentar DBH-data om registrerte studentar i 1. og 2. syklus")
   registrerte_OM <- dbh_data(124, filters=c("Institusjonskode"="1175"),
                              group_by=c("Stednavn campus", "Studieprogramkode", "Årstall", "Semester"))#,
                                         # "Andel av heltid", "Andel praksis"))
 
   registrerte_OM <- bind_rows(registrerte_OM, registrerte_OM_phd)
   registrerte_OM <- registrerte_OM %>% filter(Semester == 3)
-  
+  # Teste for å sjå om små tal er med
+  # print(registrerte_OM %>% filter(Antall < 3) %>% select(Studieprogramkode, Årstall, Antall), n=Inf)
+  # return()
   # Slår saman med studieprogramvariablane
   registrerte_OM <- left_join(studietilbod_dbh, registrerte_OM, "Studieprogramkode")
 
@@ -154,7 +180,8 @@ SP_studietilbod_OM <- function(mal_fil = "Rapportfiler/Studieoversikt/Studieover
   registrerte_OM <- registrerte_OM %>% OM_set_syklus(Nivåkode)
 
   #** 
-  #* Søknadsdata 
+  #* Søknadsdata
+  print("Hentar DBH-data om søknader")
   søknadsdata <- dbh_data(379, filters = c("Institusjonskode"="1175"), 
                           group_by = c("Studieprogramkode", "Årstall", "Kvalifisert", "Prioritet", "Semester", "Opptakstype"))
   
@@ -181,6 +208,7 @@ SP_studietilbod_OM <- function(mal_fil = "Rapportfiler/Studieoversikt/Studieover
   sp_1pri_søkarar_L <- sp_1pri_søkarar_L %>% OM_set_syklus(Nivåkode)
   
   # Endre til faktor, for å kunne sortere betre
+  # Vise studieplassar, kvalifisert 1. prioritet, møtt, møtt per plass
   studiestad_sortering <- c("Kjeller", "Pilestredet", "OsloMet", "Uplassert")
   fakultet_sortering <- c("HV", "LUI", "SAM", "TKD", "SPS", "OsloMet")
   syklus_sortering <- c("Bachelor", "Master", "Forskarutdanning", "Andre", "Vidaregåande skule-nivå")
@@ -211,7 +239,7 @@ SP_studietilbod_OM <- function(mal_fil = "Rapportfiler/Studieoversikt/Studieover
   sp_1pri_søkarar_L <- sp_1pri_søkarar_L %>%
     OM_lag_faktor(Syklus, nivå = syklus_sortering, sortert = TRUE)
   
-  # return(list(registrerte_OM, studietilbod))
+  # return(list(registrerte = registrerte_OM, LOK = sp_1pri_søkarar_L, NOM = sp_1pri_søkarar_N, studietilbod = studietilbod))
   
   # Om det ikkje er oppgitt ei utfil, returner datasett
   if (is.null(ut_fil)) {
@@ -220,17 +248,27 @@ SP_studietilbod_OM <- function(mal_fil = "Rapportfiler/Studieoversikt/Studieover
   
   # Om utfila ser ut som docx, skriv til Word
   if (!is.null(ut_fil) & grepl(".docx$", mal_fil)) {
+    print(paste("Startar utskrift til", ut_fil))
     # Skriv ut til fil
     arbeidsbok <- read_docx(mal_fil)
     # Flyttar peikar til starten
     arbeidsbok <- cursor_begin(arbeidsbok)
     
-    styles_info(arbeidsbok, type = "paragraph") %>% select(style_name) %>% print
-    styles_info(arbeidsbok, type = "table") %>% select(style_name) %>% print
+    # styles_info(arbeidsbok, type = "paragraph") %>% select(style_name) %>% print
+    # styles_info(arbeidsbok, type = "table") %>% select(style_name) %>% print
     
-    # Skriv ut tittel og innhaldsforteikning(?)
+    # Skriv ut tittel og ingress
     dokumenttittel <- paste("Studieoversikt OsloMet", år_no) 
     arbeidsbok <- body_add_par(arbeidsbok, "Studieoversikt OsloMet 2023", pos = "before", style = "heading 1")
+    dbh_api_url <- hyperlink_ftext(text = "DBHs API for åpne data", 
+                                   href = "https://dbh.hkdir.no/datainnhold/tabell-dokumentasjon",
+                                   prop = fp_text_lite(color = "blue", underlined = T))
+    dbh_forklaring <- paste("Denne rapporten er i stor del produsert automatisk med data frå DBH sitt grensesnitt", 
+          "for henting av opne data. Det er mogleg å tilpasse rapporten til å vise andre data",
+          "som er tilgjengeleg gjennom ")
+    innleiing <- fpar(ftext(dbh_forklaring), dbh_api_url, ftext("."))
+    arbeidsbok <- body_add_fpar(arbeidsbok, innleiing, style = "Normal")
+    arbeidsbok <- body_add_par(arbeidsbok, "", style = "Normal")
     # arbeidsbok <- body_add_toc(arbeidsbok, level = 2, pos = "after", style = NULL)
     
     # Flyttar peikar til etter maltekst
@@ -239,10 +277,21 @@ SP_studietilbod_OM <- function(mal_fil = "Rapportfiler/Studieoversikt/Studieover
     
     # Lagar nokre overordna statistikkar
     # OBS beskrive tydeleg kva tala er - ta utgangspunkt i nyaste år, eller serie?
-        
+    print("Lagar overordna statistikkar og diagram")
+    #**
+    #* Søylediagram tal på studietilbod per syklus, utan vidaregåande nivå
+    studietilbod_syklus_tidsserie <- registrerte_OM %>% filter(Syklus != "Vidaregåande skule-nivå") %>%
+      group_by(Syklus, Årstall) %>% 
+     summarise(Studietilbod = n())
+
+    sp_bar_studietilbod_syklus <- ms_barchart(studietilbod_syklus_tidsserie,
+                                           x = "Syklus", y = "Studietilbod",
+                                           group = "Årstall")
+    sp_bar_studietilbod_syklus <- sp_bar_studietilbod_syklus %>% sp_bar_serie_format
+    
     #**
     #* Søylediagram registrerte studentar per syklus, utan vidaregåande nivå
-    registrerte_syklus_tidsserie <- registrerte_OM %>%  filter(Nivåkode != "VS") %>%
+    registrerte_syklus_tidsserie <- registrerte_OM %>% filter(Nivåkode != "VS") %>%
       group_by(Syklus, Årstall) %>% 
       summarise(Antall = sum(Antall, na.rm = T))
 
@@ -256,7 +305,7 @@ SP_studietilbod_OM <- function(mal_fil = "Rapportfiler/Studieoversikt/Studieover
     
     #**
     #* Søylediagram andel heiltidsstudium per syklus
-    sp_andel_heltid <- registrerte_OM  %>% filter(Nivåkode != "VS", Nivåkode != "FU") %>%
+    sp_andel_heltid <- registrerte_OM %>% filter(Nivåkode != "VS", Nivåkode != "FU") %>%
       mutate(Heltid = `Andel av heltid` == 1) %>%
       group_by(Syklus, Årstall) %>% summarise("Andel heiltidsutdanning" = mean(Heltid, na.rm=T))
     sp_bar_andel_heltid <- ms_barchart(sp_andel_heltid, x = "Syklus", y = "Andel heiltidsutdanning",
@@ -270,15 +319,16 @@ SP_studietilbod_OM <- function(mal_fil = "Rapportfiler/Studieoversikt/Studieover
     sp_andel_praksis <- registrerte_OM  %>% filter(Nivåkode != "VS", Nivåkode != "FU") %>%
       mutate(Praksis = `Andel praksis` > 0) %>%
       group_by(Syklus, Årstall) %>% summarise("Andel utdanningar med praksis" = mean(Praksis, na.rm=T))
-    sp_bar_andel_prakis <- ms_barchart(sp_andel_praksis, x = "Syklus", y = "Andel utdanningar med praksis",
+    sp_bar_andel_praksis <- ms_barchart(sp_andel_praksis, x = "Syklus", y = "Andel utdanningar med praksis",
                                        group = "Årstall")
-    sp_bar_andel_prakis <- sp_bar_andel_prakis %>% sp_bar_serie_format
-    sp_bar_andel_prakis <- sp_bar_andel_prakis %>% sp_label_prosent
-    sp_bar_andel_prakis <- sp_bar_andel_prakis %>% sp_ax_y_prosent
+    sp_bar_andel_praksis <- sp_bar_andel_praksis %>% sp_bar_serie_format
+    sp_bar_andel_praksis <- sp_bar_andel_praksis %>% sp_label_prosent
+    sp_bar_andel_praksis <- sp_bar_andel_praksis %>% sp_ax_y_prosent
 
     #**
     #* Søylediagram 1.-prioritetssøkarar NOM-opptak
-    sp_1pri_søkarar_syklus_tidsserie_N <- sp_1pri_søkarar_N %>% group_by(Syklus, Årstall) %>% 
+    sp_1pri_søkarar_syklus_tidsserie_N <- sp_1pri_søkarar_N %>% filter(Nivåkode != "VS") %>%
+      group_by(Syklus, Årstall) %>% 
       summarise("Kvalifiserte 1.-prioritetssøkarar Samordna opptak" = sum(Søknadsalternativer, na.rm = T))
     
     sp_bar_1pri_søkarar_syklus_N <- ms_barchart(sp_1pri_søkarar_syklus_tidsserie_N,
@@ -288,34 +338,47 @@ SP_studietilbod_OM <- function(mal_fil = "Rapportfiler/Studieoversikt/Studieover
     
     #**
     #* Søylediagram 1.-prioritetssøkarar LOK-opptak
-    sp_1pri_søkarar_syklus_tidsserie_L <- sp_1pri_søkarar_L %>% group_by(Syklus, Årstall) %>% 
+    sp_1pri_søkarar_syklus_tidsserie_L <- sp_1pri_søkarar_L %>% filter(Nivåkode != "VS") %>%
+    group_by(Syklus, Årstall) %>% 
       summarise("Kvalifiserte 1.-prioritetssøkarar lokalt opptak" = sum(Søknadsalternativer, na.rm = T))
     
     sp_bar_1pri_søkarar_syklus_L <- ms_barchart(sp_1pri_søkarar_syklus_tidsserie_L,
                                               x = "Syklus", y = "Kvalifiserte 1.-prioritetssøkarar lokalt opptak",
                                               group = "Årstall")
     sp_bar_1pri_søkarar_syklus_L <- sp_bar_1pri_søkarar_syklus_L %>% sp_bar_serie_format
-        
+    
+    #* Søylediagram tal på studietilbod LN/HN
+    studietilbod_ikkjegrad_tidsserie <- registrerte_OM %>% filter(grepl("LN|HN", Nivåkode)) %>% 
+      group_by(Nivåkode, Årstall) %>% 
+      summarise(Studietilbod = n())
+    
+    sp_bar_ikkjegrad_syklus <- ms_barchart(studietilbod_ikkjegrad_tidsserie,
+                                              x = "Nivåkode", y = "Studietilbod",
+                                              group = "Årstall")
+    sp_bar_ikkjegrad_syklus <- sp_bar_ikkjegrad_syklus %>% sp_bar_serie_format
+    
     # Definere diagramstorleik
     diagram_w = 6.29
     diagram_h = 3.75
     
     ##** Legg til diagram i dokument
+    print("Skriv diagram til fil")
     # caption - mal
     # caption_registrerte_syklus <- block_caption(utrekningsgrunnlag, "Normal")
     # arbeidsbok <- body_add_caption(arbeidsbok, caption_registrerte_syklus, pos = "after")    
     
     #** Side 1
+    arbeidsbok <- body_add_par(arbeidsbok, "OsloMets utdanningar i fugleperspektiv", style = "heading 2")
     
     # Registrerte per syklus
-    arbeidsbok <- body_add_par(arbeidsbok, "OsloMets utdanningar i fugleperspektiv", style = "heading 2")
-    arbeidsbok <- body_add_par(arbeidsbok, "Registrerte studentar på de ulike utdanningsnivåa", style = "heading 3")
+    arbeidsbok <- body_add_par(arbeidsbok, "Registrerte studentar på dei ulike utdanningsnivåa", style = "heading 3")
     arbeidsbok <- body_add_chart(arbeidsbok, sp_bar_studentar_syklus, width = diagram_w, height = diagram_h, style = "Normal")
     arbeidsbok <- body_add_par(arbeidsbok, "", style = "Normal")
     
-    # Andel heiltidsutdanningar
-    # arbeidsbok <- body_add_par(arbeidsbok, "Heiltid og deltid på dei ulike utdanningsnivåa", style = "heading 3")
-    # arbeidsbok <- body_add_chart(arbeidsbok, sp_bar_andel_heltid, width = diagram_w, height = diagram_h, style = "Normal")
+    # Tal på studietilbod heiltidsutdanningar
+    arbeidsbok <- body_add_par(arbeidsbok, "Tal på studietilbod på dei ulike utdanningsnivåa", style = "heading 3")
+    arbeidsbok <- body_add_chart(arbeidsbok, sp_bar_studietilbod_syklus, width = diagram_w, height = diagram_h, style = "Normal")
+    
     arbeidsbok <- body_add_break(arbeidsbok)
     
     #** Side 2
@@ -330,7 +393,7 @@ SP_studietilbod_OM <- function(mal_fil = "Rapportfiler/Studieoversikt/Studieover
     
     # Andel utdanningar med praksis
     arbeidsbok <- body_add_par(arbeidsbok, "Praksis på dei ulike utdanningsnivåa", style = "heading 3")
-    arbeidsbok <- body_add_chart(arbeidsbok, sp_bar_andel_prakis, width = diagram_w, height = diagram_h, style = "Normal")
+    arbeidsbok <- body_add_chart(arbeidsbok, sp_bar_andel_praksis, width = diagram_w, height = diagram_h, style = "Normal")
     caption_praksis_syklus <- block_caption(utrekningsgrunnlag, "Normal")
     arbeidsbok <- body_add_caption(arbeidsbok, caption_praksis_syklus, pos = "after")
     
@@ -349,44 +412,159 @@ SP_studietilbod_OM <- function(mal_fil = "Rapportfiler/Studieoversikt/Studieover
 
     arbeidsbok <- body_add_break(arbeidsbok)
     
-    ##** Slutt diagramdel
+    #** Side 4
     
+    # Tal på studietilbod LN/HN
+    arbeidsbok <- body_add_par(arbeidsbok, "Tal på ikkje gradsgivande studietilbod fordelt på lågare og høgare nivå", style = "heading 3")
+    arbeidsbok <- body_add_chart(arbeidsbok, sp_bar_ikkjegrad_syklus, width = diagram_w, height = diagram_h, style = "Normal")
+    arbeidsbok <- body_add_par(arbeidsbok, "", style = "Normal")
+    andre_nivå_forklaring <- paste("LN er studietilbod på lågare nivå.", 
+                              "Kategorien omfattar studietilbod på lågare nivå som ikkje er gradsgivande,", 
+                              "for det meste studietilbod på mindre enn 60 studiepoeng.", 
+                              "HN er studietilbod på høgare nivå.", 
+                              "Kategorien omfattar for det meste toårige vidareutdanninger (120 studiepoeng)", 
+                              "som bygger på bachelorgrad/yrkesutdanning,", 
+                              "samt deler av mastergrad som er delt i mindre einingar og tilbode", 
+                              "separat som til dømes som årseining eller halvårseining,", 
+                              "og som i sum kan byggast opp til ei mastergrad.")
+    caption_andre_nivå <- block_caption(andre_nivå_forklaring, "Normal")
+    arbeidsbok <- body_add_caption(arbeidsbok, caption_andre_nivå, pos = "after")
+    
+    # Mal for å legge til diagram
+    # arbeidsbok <- body_add_par(arbeidsbok, "Kvalifiserte 1.-prioritetssøkarar på dei ulike utdanningsnivåa (Lokalt opptak)", style = "heading 3")
+    # arbeidsbok <- body_add_chart(arbeidsbok, sp_bar_1pri_søkarar_syklus_L, width = diagram_w, height = diagram_h, style = "Normal")
+
+    arbeidsbok <- body_add_break(arbeidsbok)
+    
+    ##** Slutt diagramdel
+
+    # TODO - registrerttal for ph.d.
+    ##** Utsnitt av dei største studietilboda
+    print("Lagar utsnitt av dei største studietilboda")
+    berande_studietilbod <- studietilbod %>% filter(!is.na(`Fullførte 2023`), Syklus != "Vidaregåande skule-nivå") %>%
+      droplevels %>%
+      arrange(desc(`Fullførte 2023`)) %>%
+      group_by(Syklus) %>% slice(1:3) %>%
+      select(Syklus, Studietilbod, `Møtt 2023`, `Fullførte 2023`) %>% 
+      split(f = as.factor(.$Syklus))
+    
+    overskrift_berande_studietilbod <- "Eit utsnitt av dei største studietilboda på ulike nivå"
+    arbeidsbok <- body_add_par(arbeidsbok, overskrift_berande_studietilbod, style = "heading 3")
+    ingress_berande_studietilbod <- "Dei tre utdanningane på kvart nivå med høgst tal på fullførte i 2023."
+    arbeidsbok <- body_add_par(arbeidsbok, ingress_berande_studietilbod, style = "Normal")
+    
+    # TODO - om denne loopen fungerer, bruk den også seinare
+    for (syklusnamn in names(berande_studietilbod)) {
+      studietabell <- berande_studietilbod[[syklusnamn]] %>% ungroup %>% select(-Syklus)
+      
+      # Fjernar NA i tabellar
+      studietabell <- studietabell %>% mutate(across(where(is.numeric), as.character))
+      studietabell[is.na(studietabell)] <- "–"
+      
+      # Legg til i dokument
+      arbeidsbok <- body_add_par(arbeidsbok, syklusnamn, style = "heading 4")
+      arbeidsbok <- body_add_table(arbeidsbok, studietabell, style = "Greentable")
+      arbeidsbok <- body_add_par(arbeidsbok, "", style = "Normal")
+    }
+    # Lagar inndelingsskift for å få landskapsorientering for tabellane
+    arbeidsbok <- body_end_section_portrait(arbeidsbok)
+    # arbeidsbok <- body_add_break(arbeidsbok)
+    ##** Slutt utsnitt av dei største studietilboda
+    
+    #**
+    #* Hente inn data om nye program
+    print("Bygger tabellar om nye program") 
+    # TODO legg til tal på møtte
+    nyeprogram <- read_excel("../datafiler/studieoversikt/Studium_etablert_2017-2023.xlsx", skip = 2)
+    nyeprogram <- nyeprogram %>% mutate(Studieprogramkode = nyeprogram[["Studietilbod"]] %>% word(1))
+    nyeprogram[["Studietilbod"]] <- nyeprogram[["Studietilbod"]] %>% str_remove(paste(nyeprogram[["Studietilbod"]] %>% word(1), ""))
+    søkarar_2023_LOK <- sp_1pri_søkarar_L %>% filter(Årstall == år_no) %>% select(Studieprogramkode, LOK = Søknadsalternativer)
+    nyeprogram <- left_join(nyeprogram, søkarar_2023_LOK, by="Studieprogramkode")
+    søkarar_2023_NOM <- sp_1pri_søkarar_N %>% filter(Årstall == år_no) %>% select(Studieprogramkode, NOM = Søknadsalternativer)
+    nyeprogram <- left_join(nyeprogram, søkarar_2023_NOM, by="Studieprogramkode")
+    nyeprogram <- nyeprogram %>% mutate("Kvalifiserte 1.-prioritet" = coalesce(LOK, NOM))
+    nyeprogram <- nyeprogram %>% mutate("Kvalifiserte 1.-prioritet per studieplass" = 
+                                          round(`Kvalifiserte 1.-prioritet`/as.numeric(Studieplassar), 1))
+    møtt_nyeprogram <- studentar_OM %>% filter(Årstall == år_no) %>% select(-Årstall, Møtte = Antall)
+    nyeprogram <- left_join(nyeprogram, møtt_nyeprogram, by = "Studieprogramkode")
+    nyeprogram <- nyeprogram %>% mutate("Møtte per studieplass" = 
+                                          round(Møtte/as.numeric(Studieplassar), 1))
+    nyeprogram <- nyeprogram %>% arrange(Studietilbod) %>% 
+      select(Studietilbod, Studieplassar, `Kvalifiserte 1.-prioritet`, 
+             `Kvalifiserte 1.-prioritet per studieplass`, Møtte, `Møtte per studieplass`)
+    
+    # TODO - gjer om til funksjon
+    # Fjernar NA i tabellar
+    nyeprogram <- nyeprogram %>% mutate(across(where(is.numeric), as.character))
+    nyeprogram[is.na(nyeprogram)] <- "–"
+    
+    overskrift_nye_studietilbod <- "Nøkkeltal om nyetablerte utdanningar i perioden frå 2018"
+    arbeidsbok <- body_add_par(arbeidsbok, overskrift_nye_studietilbod, style = "heading 3")
+    ingress_nye <- paste("Økonomisk berekraft i eit studietilbod er spesielt avhengig av opptak av",
+                         "tilstrekkeleg mange studentar. Særleg når studietilbod blir etablert i",
+                         "felt der vi ikkje har tilbode utdanning tidlegare, kan det vere krevjande",
+                         "å anslå kor stor attraktivt ei ny utdanning vil vere.", 
+                         "I framstillinga av studietilbod som OsloMet har etablert dei siste åra,",
+                         "har vi derfor trekt fram ein del statistikk vi meiner er særleg relevant",
+                         "for å seie noko om kor vellykka etableringane har vore. Alle tala er for 2023.")
+    arbeidsbok <- body_add_par(arbeidsbok, ingress_nye, style = "Normal")
+    arbeidsbok <- body_add_table(arbeidsbok, nyeprogram, style = "Greentable")
+    nyeprogram_atterhald <- paste("Linja om Master’s Programme in Civil Engineering viser til retninga",
+                                  "konstruksjonsteknikk som vart etablert i 2017.", 
+                                  "Denne har 50 studieplassar, programmet har 145 totalt.", 
+                                  "I registerdataa går det ikkje å skilje mellom studieretningane,",
+                                  "difor er søkar- og møttal utrekna for heile programmet.")
+    caption_nyeprogram <- block_caption(nyeprogram_atterhald, "Normal")
+    arbeidsbok <- body_add_caption(arbeidsbok, caption_nyeprogram, pos = "after")
+    # arbeidsbok <- body_add_break(arbeidsbok)
+    # print(nyeprogram)
+    # return(nyeprogram)
+    ##** Slutt uttrekk nye studietilbod
+    
+    # Lagar inndelingsskift for å få landskapsorientering for tabellane
+    arbeidsbok <- body_end_section_landscape(arbeidsbok)
+    
+    ##** Start tabelldel
+    print("Skriv innleiande tekst om tabellar til dokument")
+        
     # Dele opp for å skrive ut kvar for seg, fordelt på syklus
     # Lagar først liste fordelt på syklus
     # deler så listeelementa inn i nye element, gruppert etter studiestad og tilhøyrigheit
     sp_OM_split <- studietilbod %>% split(f = as.factor(.$Syklus)) %>% 
       lapply(function(x) {x %>% group_by(Studiestad, Fakultetsnavn) %>% group_split})
     
-    # Skriv ut overskrift og ingress for tabelldel
+    # Skriv ut overskrift og innleiing for tabelldel
     tabelldel_overskrift <- "Studentar møtt til studiestart og fullførte studietilbod"
     arbeidsbok <- body_add_par(arbeidsbok, tabelldel_overskrift, style = "heading 2")
-    tabelldel_ingress_1 <- paste("Tabellane viser studietilbod med tal på studentar som har", 
+    tabelldel_innleiing_1 <- paste("Tabellane viser studietilbod med tal på studentar som har", 
                                "møtt til studiestart i haustsemesteret", 
                                "og tal på studentar som har fullført studietilbod.",
                                "For forskarutdanning, blir tal på registrerte studentar vist.")
-    arbeidsbok <- body_add_par(arbeidsbok, tabelldel_ingress_1, style = "Normal")    
-    tabelldel_ingress_2 <- paste('Utdanningar som går på deltid er markert med "(D)" etter namnet på studietilbodet.', 
+    arbeidsbok <- body_add_par(arbeidsbok, tabelldel_innleiing_1, style = "Normal")    
+    tabelldel_innleiing_2 <- paste('Utdanningar som går på deltid er markert med "(D)" etter namnet på studietilbodet.', 
                                "Utdanningar som ikkje er bachelor, master eller ph.d., er markert med tal på studiepoeng etter namnet på studietilbodet." 
-                               # TODO - fortsett her
-                               # "og tal på studentar som har fullført studietilbod.",
-                               # "For forskarutdanning, blir tal på registrerte studentar vist."
                                )
-    arbeidsbok <- body_add_par(arbeidsbok, tabelldel_ingress_2, style = "Normal")    
-    tabelldel_ingress_3 <- paste("I tabellane er ikkje tal under 3 tatt med, dette samsvarer med val DBH har gjort for å trygge personvern.",
+    arbeidsbok <- body_add_par(arbeidsbok, tabelldel_innleiing_2, style = "Normal")    
+    tabelldel_innleiing_3 <- paste("I tabellane er ikkje tal under 3 tatt med, dette samsvarer med val DBH har gjort for å trygge personvern.",
                                  "Tabellane inneheld ikkje program der det ikkje finst møtt/registrerte studentar frå dei siste to åra,",
                                  "og det heller ikkje er nokon som har fullført siste år." 
-                               # TODO - fortsett her
-                               # "og tal på studentar som har fullført studietilbod.",
-                               # "For forskarutdanning, blir tal på registrerte studentar vist."
                                )
+    arbeidsbok <- body_add_par(arbeidsbok, tabelldel_innleiing_3, style = "Normal")
+    tabelldel_innleiing_4 <- paste("Studietilboda er gruppert etter syklusane bachelor, master, forskarutdanning og andre.",
+                                 "I bachelor tar vi med bachelorgrader på 180 studiepoeng,", 
+                                 "allmennlærarutdanning og faglærarutdanning med normert studietid 4 år, og høgskulekandidat på 120 studiepoeng.",
+                                 "I master tar vi med toårig, femårig og erfaringsbaserte mastergrader.",
+                                 "I forskarutdanning tar vi med ph.d. og emne på ph.d.-nivå som blir tilbode utanom grad.",
+                                 "I andre samlar vi ikkje-gradsgivande utdanningar både på lågare og høgare nivå, inkludert årsstudium."
+                               )
+    arbeidsbok <- body_add_par(arbeidsbok, tabelldel_innleiing_4, style = "Normal")
     
     # Slutt vertikal sideretning
-    arbeidsbok <- body_add_par(arbeidsbok, tabelldel_ingress_3, style = "Normal")
-    
     # Lagar inndelingsskift for å få landskapsorientering for tabellane
     arbeidsbok <- body_end_section_portrait(arbeidsbok)
     
     # Gå gjennom dei ulike delane og skriv til Word-dokument
+    print("Skriv tabellar til dokument")
     for (s in 1:length(sp_OM_split)) {
       # Skriv ut overskrift per syklus
       syklusnamn <- sp_OM_split[s] %>% names
@@ -401,13 +579,21 @@ SP_studietilbod_OM <- function(mal_fil = "Rapportfiler/Studieoversikt/Studieover
         arbeidsbok <- body_add_par(arbeidsbok, phd_atterhald_volum, style = "Normal")
       }
       
+      if (syklusnamn == "Vidaregåande skule-nivå") {
+        VS_atterhald <- paste("Treterminstudentane får først opptak til eit eige treterminstudieprogram,", 
+                              "og blir deretter flytta over til dei vanlege bachelorprogramma.",
+                              "Studentane blir derfor med i oppteljing av fullførte studentar på",
+                              "studieprogramma dei blir overført til.")
+        arbeidsbok <- body_add_par(arbeidsbok, VS_atterhald, style = "Normal")
+      }
+      
       # Skriv ut tabellar 
       for (utsnitt in sp_OM_split[[s]]) {
         if (syklusnamn == "Forskarutdanning") {
           colnames(utsnitt) <- gsub(pattern = "Møtt ", replacement = "Registrerte ", x = colnames(utsnitt))
         }
-        utsnittID <- paste(utsnitt$Studiestad[1], utsnitt$Fakultetsnavn[1], utsnitt$Syklus[1], sep = " – ")
-        print(utsnittID)
+        utsnittID <- paste(utsnitt$Studiestad[1], utsnitt$Fakultetsnavn[1], sep = " – ") #, utsnitt$Syklus[1]
+        print(paste("Skriv tabellar om", utsnittID, "til dokument"))
         
         utsnitt <- utsnitt %>% select(-Fakultetsnavn, -Institutt, -Studieprogramkode, -Nivåkode, 
                                       -"Tilbys til", -Studiestad, -`Andel av heltid`, 
@@ -417,12 +603,22 @@ SP_studietilbod_OM <- function(mal_fil = "Rapportfiler/Studieoversikt/Studieover
         utsnitt <- utsnitt %>% mutate(across(where(is.numeric), as.character))
         utsnitt[is.na(utsnitt)] <- "–"
         arbeidsbok <- body_add_par(arbeidsbok, utsnittID, style = "heading 4")
-        arbeidsbok <- body_add_table(arbeidsbok, utsnitt, style = "Greentable") #"roller")
+        arbeidsbok <- body_add_table(arbeidsbok, utsnitt, style = "Greentable")
         arbeidsbok <- body_add_par(arbeidsbok, "", style = "Normal")
       }
       arbeidsbok <- body_add_break(arbeidsbok)
     }
+    # Set sideretning til landskap for tabelldel
     arbeidsbok <- body_end_section_landscape(arbeidsbok)
+    # sidelayout_landskap <- prop_section(
+    #   page_size = page_size(orient = "landscape"),
+    #   # page_margins = page_mar(top = 0.5, bottom = 0.5, left = 0.5, right = 0.5, gutter = 0.5),
+    #   type = "continuous"
+    # )
+    # arbeidsbok <- body_end_block_section(arbeidsbok, block_section(sidelayout_landskap))
+    
+    # Test - Flyttar peikar til slutt, slettar tom side
+    # arbeidsbok <- cursor_end(arbeidsbok) %>% body_remove()
     print(arbeidsbok, ut_fil)
   }
   
