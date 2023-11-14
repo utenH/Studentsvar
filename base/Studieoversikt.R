@@ -260,7 +260,7 @@ SP_studietilbod_OM <- function(mal_fil = "Rapportfiler/Studieoversikt/Studieover
     # Skriv ut tittel og ingress
     dokumenttittel <- paste("Studieoversikt OsloMet", år_no) 
     arbeidsbok <- body_add_par(arbeidsbok, "Studieoversikt OsloMet 2023", pos = "before", style = "heading 1")
-    dbh_api_url <- hyperlink_ftext(text = "DBHs API for åpne data", 
+    dbh_api_url <- hyperlink_ftext(text = "DBHs API for data", 
                                    href = "https://dbh.hkdir.no/datainnhold/tabell-dokumentasjon",
                                    prop = fp_text_lite(color = "blue", underlined = T))
     dbh_forklaring <- paste("Denne rapporten er i stor del produsert automatisk med data frå DBH sitt grensesnitt", 
