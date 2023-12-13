@@ -7,8 +7,8 @@ skrivvar <- function(sdf, variabel) {
 }
 
 ##* For å skrive ut tabell til utklippsbrett
-til_utklipp <- function(sdf, radnamn = F) {
-  sdf %>% write.table("clipboard", sep = "\t", row.names = radnamn, dec = ",")
+til_utklipp <- function(sdf, storleik = "", radnamn = F) {
+  sdf %>% write.table(paste("clipboard", storleik, sep = "-"), sep = "\t", row.names = radnamn, dec = ",")
   return(sdf)
 }
 
@@ -32,6 +32,126 @@ OM_prepare_2022 <- function(innfil, dataår, instnr, programkode) {
   OM <- SB_prep_indeks(OM)
   return(OM)
 } 
+
+##** 
+##* Studiestart
+##* 
+
+OM_prepare_studiestart_2023 <- function(innfil = "../datafiler/studiestart/Studiestart 2023.xlsx", dataår = 2023) {
+  OM <- read_excel(innfil)
+  OM <- OM %>% clean_names
+  OM %>% names %>% print
+  OM <- OM %>% mutate(undersokelse_år = dataår)
+  OM <- OM %>% mutate(gruppe_ar = undersokelse_år)
+  OM <- OM %>% rename(Fakultetsnavn = fakultet)
+  OM <- OM %>% rename(Institutt = institutt)
+  OM <- OM %>% rename(Studieprogramkode = programkode)
+  OM <- OM %>% rename(Studietilbud = programnavn)
+  OM <- OM %>% mutate(Studieprogram_instnamn = paste(Institutt, Studieprogramkode, Studietilbud))
+  OM <- OM %>% mutate(Institusjon = "OsloMet")
+  
+  # Omkoding
+  svar_nivå <- c("1 – i liten grad", "2", "3", "4", "5 – i stor grad")
+  OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_jeg_opplever_a_vaere_en_del_av_et_studentmiljo_pa_studiet_mitt, svar_nivå)
+  OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_studiet_mitt_har_lagt_til_rette_for_ulike_gruppeaktiviteter, svar_nivå)
+  OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_de_faglige_og_sosiale_aktivitetene_pa_studiet_har_bidratt_til_at_jeg_har_blitt_kjent_med_medstudenter, svar_nivå)
+  OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_jeg_har_noen_a_diskutere_og_samarbeide_med_utenom_det_faglige_opplegget_pa_studiet_mitt, svar_nivå)
+  OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_jeg_har_noen_pa_studiet_mitt_jeg_kan_snakke_med_om_utfordringer_jeg_opplever_som_student, svar_nivå)
+  OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_jeg_opplever_at_jeg_henger_med_faglig_i_studiet_mitt, svar_nivå)
+  OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_det_faglige_innholdet_pa_studiet_svarer_sa_langt_til_mine_forventinger, svar_nivå)
+  
+  OM <- OM %>% OM_janei_bin_nyvar(svar = ser_du_for_deg_at_du_kommer_til_a_fullfore_dette_studiet,
+                                  nyvar = ser_du_for_deg_at_du_kommer_til_a_fullfore_dette_studiet_bin)
+  
+  OM <- OM %>% mutate(ser_du_for_deg_at_du_kommer_til_a_fullfore_dette_studiet = 
+                        factor(ser_du_for_deg_at_du_kommer_til_a_fullfore_dette_studiet,
+                                        levels = c("Ja", "Vet ikke", "Nei"),
+                                        labels = c("Ja", "Vet ikke", "Nei"),
+                               ordered = T))
+
+  return(OM) 
+}
+
+##** 
+##* Studiestart
+##* bruk EXC_tabell_meirinfo for å lage tabell om informasjon studentar sakna
+
+OM_prepare_exchangestudents_2023 <- function(innfil = "../datafiler/exchangestudents/exchangestudents_h2023_data.xlsx", dataår = 2023) {
+  OM <- read_excel(innfil)
+  OM <- OM %>% clean_names
+  OM %>% names %>% print
+  OM <- OM %>% mutate(undersokelse_år = dataår)
+  OM <- OM %>% mutate(gruppe_ar = undersokelse_år)
+  OM <- OM %>% rename(Fakultetsnavn = fakultet)
+  OM <- OM %>% rename(Institutt = institutt)
+  OM <- OM %>% rename(Studieprogramkode = programkode)
+  OM <- OM %>% rename(Studietilbud = programnavn)
+  OM <- OM %>% mutate(Studieprogram_instnamn = paste(Institutt, Studieprogramkode, Studietilbud))
+  OM <- OM %>% mutate(Institusjon = "OsloMet")
+  
+  # Omkoding
+  svar_nivå <- c("1 – i liten grad", "2", "3", "4", "5 – i stor grad")
+  OM <- OM %>% OM_text_to_factor(to_what_extent_are_you_satisfied_with_the_admission_process_to_oslo_met_application_admission_and_acceptance)
+  OM <- OM %>% OM_text_to_factor(to_what_extent_are_you_satisfied_with_the_information_you_received_before_you_started)
+  OM <- OM %>% OM_text_to_factor(to_what_extent_do_you_agree_with_the_following_statements_i_consider_myself_a_part_of_a_student_environment_in_my_studies)
+  OM <- OM %>% OM_text_to_factor(to_what_extent_do_you_agree_with_the_following_statements_my_course_courses_has_facilitated_various_group_activities)
+  OM <- OM %>% OM_text_to_factor(to_what_extent_do_you_agree_with_the_following_statements_the_academic_and_social_activities_in_my_course_courses_have_helped_me_get_to_know_fellow_students)
+  OM <- OM %>% OM_text_to_factor(to_what_extent_do_you_agree_with_the_following_statements_i_have_someone_to_discuss_and_collaborate_with_outside_of_my_course_courses)
+  OM <- OM %>% OM_text_to_factor(to_what_extent_do_you_agree_with_the_following_statements_i_have_someone_in_my_course_courses_i_can_talk_with_about_challenges_i_experience_as_a_student)
+  OM <- OM %>% OM_text_to_factor(to_what_extent_do_you_agree_with_the_following_statements_i_feel_treated_equally_to_local_students)
+  OM <- OM %>% OM_text_to_factor(to_what_extent_do_you_agree_with_the_following_statements_i_feel_that_i_am_able_to_keep_up_with_the_academic_requirements_in_course_courses_so_far)
+  OM <- OM %>% OM_text_to_factor(to_what_extent_do_you_agree_with_the_following_statements_the_academic_content_of_my_course_courses_has_met_my_expectations_so_far)
+
+  # Ja/Nei/Veit ikkje
+  # did_you_use_the_course_catalogue_on_oslomet_no_before_deciding_what_courses_you_wanted_to_apply_for
+  # are_you_satisfied_with_the_academic_support_you_have_received_so_far
+  # do_you_have_any_inclusion_needs
+  # gender
+  
+  # OM <- OM %>% mutate(used_course_catalogue =
+  #                       factor(did_you_use_the_course_catalogue_on_oslomet_no_before_deciding_what_courses_you_wanted_to_apply_for,
+  #                              levels = c("Ja", "Nei", "Vet ikke"),
+  #                              labels = c("Ja", "Nei", "Vet ikke"),
+  #                              ordered = T))
+  janeiv <- c("Yes", "No", "Do not know")
+  OM <- OM_lag_faktor(OM, did_you_use_the_course_catalogue_on_oslomet_no_before_deciding_what_courses_you_wanted_to_apply_for, janeiv)
+  OM <- OM_lag_faktor(OM, are_you_satisfied_with_the_academic_support_you_have_received_so_far, janeiv)
+  OM <- OM_lag_faktor(OM, do_you_have_any_inclusion_needs, janeiv)
+  OM <- OM_lag_faktor(OM, gender, c("Female", "Male", "Other", "Do not wish to answer"))
+  OM <- OM_lag_faktor(OM, what_is_your_age, c("Under 21 years", "21-24 years","25-30 years", "31-40 years", "Do not wish to answer"))
+  
+  # OM <- OM %>% OM_janei_bin_nyvar(svar = did_you_use_the_course_catalogue_on_oslomet_no_before_deciding_what_courses_you_wanted_to_apply_for,
+  #                                 nyvar = used_course_catalogue)
+  # 
+  # OM <- OM %>% OM_janei_bin_nyvar(svar = are_you_satisfied_with_the_academic_support_you_have_received_so_far,
+  #                                 nyvar = satisfied_academic_support)
+  # 
+  # OM <- OM %>% OM_janei_bin_nyvar(svar = do_you_have_any_inclusion_needs,
+  #                                 nyvar = inclusion_needs)
+  
+  # OM <- OM %>% OM_janei_bin_nyvar(svar = gender,
+  #                                 nyvar = gender_num)
+  
+
+  
+  # Fleirval
+  # what_do_you_wish_you_had_received_more_information_about_before_arrival_at_oslo_met_you_can_choose_multiple_options_admission_nomination_application_declaration
+  # what_do_you_wish_you_had_received_more_information_about_before_arrival_at_oslo_met_you_can_choose_multiple_options_international_coordinator
+  # what_do_you_wish_you_had_received_more_information_about_before_arrival_at_oslo_met_you_can_choose_multiple_options_buddy_programme
+  # what_do_you_wish_you_had_received_more_information_about_before_arrival_at_oslo_met_you_can_choose_multiple_options_pre_arrival_guide_residence_permit_finance_udi_insurance_housing_accommodation_etc
+  
+  # Fjerne linjeskift, dei lagar krøll i utskrift til xlsx
+  OM <- OM %>% mutate(across(where(is.character), ~gsub("\r\n", " ", .)))
+  
+  return(OM) 
+}
+
+# Gjer dette utanom, for enkelheits skuld
+EXC_tabell_meirinfo <- function(sdf) {
+  sdf %>% group_by(fakultet) %>% summarise(across(starts_with("what_do_you_wish_you_had"), ~sum(. == "Yes"))) %>% 
+    set_names(c("Fakultet", "Admission", "International coordinator", "Buddy", "Pre-arrival"))
+  return(sdf)
+}
 
 ##* Studiebarometeret
 SB_prepare_2022 <- function(innfil, dataår, instnr) {
@@ -442,6 +562,8 @@ kople_studieprogramkode <- function(sdf, vis_samla_kode = T) {
         Studieprogramkode == "SPH" ~ "SYKK+SPH",
         Studieprogramkode == "SYKP" ~ "SYKP+SYPLGR", 
         Studieprogramkode == "SYPLGR" ~ "SYKP+SYPLGR",
+        Studieprogramkode == "GVH" ~ "VERB+GVH",
+        Studieprogramkode == "VERB" ~ "VERB+GVH",
         TRUE ~ Studieprogramkode))
   }
   if (!vis_samla_kode) {
@@ -449,10 +571,40 @@ kople_studieprogramkode <- function(sdf, vis_samla_kode = T) {
       mutate(Studieprogramkode = case_when(
         Studieprogramkode == "SPH" ~ "SYKK",
         Studieprogramkode == "SYPLGR" ~ "SYKP",
+        Studieprogramkode == "GVH" ~ "VERB",
         TRUE ~ Studieprogramkode))
   }
   return(sdf)
 }
+
+##**
+##* Legg til studiestadnamn for 1. og 2. syklus
+##* 
+##* TODO – nokre studietilbod er registrert både på Kjeller og Pilestredet, desse blir plassert på ein av dei
+OM_studiestad <- function(sdf = NULL, eldste = 0) {
+  # Hentar stadnavn i 1. og 2. syklus
+  # print("Hentar DBH-data om stadnavn i 1. og 2. syklus")
+  studiestad_OM <- dbh_data(124, filters=c("Institusjonskode"="1175"), 
+                            group_by=c("Institusjonskode", "Stednavn campus", "Studieprogramkode", "Årstall")) %>%
+    filter(Årstall >= eldste) %>%
+    select(Studieprogramkode, Studiestad = `Stednavn campus`) %>% 
+    filter(!grepl("UPLASSERT|HVXS|INTER", Studieprogramkode), !grepl("Sandvika", Studiestad),
+           !(Studieprogramkode == "BIGB" & Studiestad == "Kjeller"),
+           !(Studieprogramkode == "MAPHN" & Studiestad == "Kjeller"),
+           !(Studieprogramkode == "MAVITE" & Studiestad == "Kjeller"), 
+           !(Studieprogramkode == "PDB" & Studiestad == "Pilestredet"),
+           !(Studieprogramkode == "VEIPR" & Studiestad == "Kjeller")) %>%
+    mutate(Studiestad = case_when(Studiestad == "Uplassert" ~ "Pilestredet",
+                                  T ~ Studiestad)) %>% unique()
+  
+  if (!is.null(sdf)) {
+  # Legg til informasjon om studiestad
+  sdf <- left_join(sdf, studiestad_OM, "Studieprogramkode")
+  return(sdf)
+  }
+  return(studiestad_OM)
+}
+
 ##**
 ##* Funksjon for å hente inn programdata frå excelfil
 ##* sdf - dataframe som skal utvidast
@@ -1417,6 +1569,19 @@ SB_name_fak_kort <- function(sdf) {
   ))
 }
 
+# ##** 
+# ##* Exchange students survey
+# ##* Slår saman fleirval lagra i ulike variablar til ein factor  
+# EXC_fleirval_til_faktor <- function(sdf) {
+#   sdf$meirinfo[sdf$what_do_you_wish_you_had_received_more_information_about_before_arrival_at_oslo_met_you_can_choose_multiple_options_admission_nomination_application_declaration == "Yes"] <- "Admission"
+#   sdf$meirinfo[sdf$what_do_you_wish_you_had_received_more_information_about_before_arrival_at_oslo_met_you_can_choose_multiple_options_international_coordinator == "Yes"] <- "International coordinator"
+#   sdf$meirinfo[sdf$what_do_you_wish_you_had_received_more_information_about_before_arrival_at_oslo_met_you_can_choose_multiple_options_buddy_programme == "Yes"] <- "Buddy programme"
+#   sdf$meirinfo[sdf$what_do_you_wish_you_had_received_more_information_about_before_arrival_at_oslo_met_you_can_choose_multiple_options_pre_arrival_guide_residence_permit_finance_udi_insurance_housing_accommodation_etc == "Yes"] <- "Pre-Arrival guide"
+#   nivå <- c("Admission", "International coordinator", "Buddy programme", "Pre-Arrival guide")
+#   sdf <- OM_lag_faktor(sdf, meirinfo, nivå, sortert = T)
+#   return(sdf)
+# }
+
 ##** 
 ##* Generiske funksjonar for omkoding av variablar
 ##* 
@@ -1492,7 +1657,27 @@ OM_janei_bin_nyvar <- function(sdf, nyvar, svar) {
 ##** 
 ##* Kodar om frå tekst til faktor basert på variablar som inneheld tal
 ##* 
-OM_text_to_factor <- function(sdf, innvariabel, utvariabel, nivå = NULL) {
+OM_text_to_factor <- function(sdf, innvariabel, nivå = NULL) {
+  # if (is.null(utvariabel)) {
+  #   utvariabel <- {{innvariabel}}
+  # }
+  sdf <- sdf %>% mutate({{innvariabel}} := case_when(
+    grepl("1", {{innvariabel}}) ~ 1,
+    grepl("2", {{innvariabel}}) ~ 2,
+    grepl("3", {{innvariabel}}) ~ 3,
+    grepl("4", {{innvariabel}}) ~ 4,
+    grepl("5", {{innvariabel}}) ~ 5,
+    {{innvariabel}} != "" ~ NaN
+  ))
+  if (is.vector(nivå)) {
+    sdf <- sdf %>% mutate({{innvariabel}} := factor({{innvariabel}},
+                                                   levels = c(1, 2, 3, 4, 5),
+                                                 labels = nivå))
+  }
+  return(sdf)
+}
+
+OM_text_to_factor_nyvar <- function(sdf, innvariabel, nivå = NULL, utvariabel = NULL) {
   sdf <- sdf %>% mutate({{utvariabel}} := case_when(
     grepl("1", {{innvariabel}}) ~ 1,
     grepl("2", {{innvariabel}}) ~ 2,
@@ -1504,11 +1689,10 @@ OM_text_to_factor <- function(sdf, innvariabel, utvariabel, nivå = NULL) {
   if (is.vector(nivå)) {
     sdf <- sdf %>% mutate({{utvariabel}} := factor({{utvariabel}},
                                                    levels = c(1, 2, 3, 4, 5),
-                                                 labels = nivå))
+                                                   labels = nivå))
   }
   return(sdf)
 }
-
 ##**
 ##* Til å lage binær variabel for dei to beste svaralternativa. 
 ##* Fungerer med across, t.d.:

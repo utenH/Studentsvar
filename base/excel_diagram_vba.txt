@@ -1,0 +1,220 @@
+Sub DiagramFordeling()
+'
+' DiagramFordeling Macro
+'
+' Keyboard Shortcut: Ctrl+l
+'
+    Dim myRange As Range
+    Set myRange = Selection
+        
+    MyChartsNo = CInt(ActiveSheet.ChartObjects.Count) Mod 2
+    LeftPosition = 575
+    RelativePosition = (MyChartsNo * 540)
+    TopPosition = 35 + RelativePosition
+   
+    ActiveSheet.Shapes.AddChart2(201, xlColumnClustered, LeftPosition, TopPosition).Select
+    ActiveChart.ApplyChartTemplate ( _
+        "C:\Users\kyrremat\AppData\Roaming\Microsoft\Templates\Charts\Fordeling_2022.crtx" _
+        )
+    ActiveChart.SetSourceData Source:=myRange
+    ActiveChart.DisplayValueNotAvailableAsBlank = True
+    
+    Call DiagramTittelOgDimensjon
+End Sub
+Sub DiagramOverUnder()
+'
+' DiagramOverUnder Macro
+'
+' Keyboard Shortcut: Ctrl+j
+'
+    Dim myRange As Range
+    Set myRange = Selection
+        
+    MyChartsNo = CInt(ActiveSheet.ChartObjects.Count) Mod 2
+    LeftPosition = 575
+    RelativePosition = (MyChartsNo * 540)
+    TopPosition = 35 + RelativePosition
+   
+    ActiveSheet.Shapes.AddChart2(201, xlColumnClustered, LeftPosition, TopPosition).Select
+    ActiveChart.ApplyChartTemplate ( _
+        "C:\Users\kyrremat\AppData\Roaming\Microsoft\Templates\Charts\Overundersnitt_2022.crtx" _
+        )
+    ActiveChart.SetSourceData Source:=myRange
+    ActiveChart.DisplayValueNotAvailableAsBlank = True
+    
+    Call DiagramTittelOgDimensjon
+End Sub
+Sub DiagramSnitt()
+'
+' DiagramSnitt Macro
+'
+' Keyboard Shortcut: Ctrl+m
+'
+    Dim myRange As Range
+    Set myRange = Selection
+    
+    MyChartsNo = CInt(ActiveSheet.ChartObjects.Count) Mod 2
+    LeftPosition = 575
+    RelativePosition = (MyChartsNo * 540)
+    TopPosition = 35 + RelativePosition
+    
+    ActiveSheet.Shapes.AddChart2(201, xlColumnClustered, LeftPosition, TopPosition).Select
+    ActiveChart.ApplyChartTemplate ( _
+        "C:\Users\kyrremat\AppData\Roaming\Microsoft\Templates\Charts\Snitt_2022.crtx")
+    ActiveChart.SetSourceData Source:=myRange
+    ActiveChart.DisplayValueNotAvailableAsBlank = True
+    
+    Call DiagramTittelOgDimensjon
+End Sub
+Sub DiagramSnittLikert5()
+'
+' DiagramSnittLikert5 Macro
+'
+' Keyboard Shortcut: Ctrl+Shift+k
+'
+    Dim myRange As Range
+    Set myRange = Selection
+    
+    MyChartsNo = CInt(ActiveSheet.ChartObjects.Count) Mod 2
+    LeftPosition = 575
+    RelativePosition = (MyChartsNo * 540)
+    TopPosition = 35 + RelativePosition
+    
+    ActiveSheet.Shapes.AddChart2(201, xlColumnClustered, LeftPosition, TopPosition).Select
+    ActiveChart.ApplyChartTemplate ( _
+        "C:\Users\kyrremat\AppData\Roaming\Microsoft\Templates\Charts\Snitt_likert5_2022.crtx")
+    ActiveChart.SetSourceData Source:=myRange
+    ActiveChart.DisplayValueNotAvailableAsBlank = True
+    
+    Call DiagramTittelOgDimensjon
+End Sub
+Sub DiagramSnittAlder()
+'
+' DiagramSnittAlder Macro
+'
+' Keyboard Shortcut: Ctrl+Shift+m
+'
+    Dim myRange As Range
+    Set myRange = Selection
+    
+    MyChartsNo = CInt(ActiveSheet.ChartObjects.Count) Mod 2
+    LeftPosition = 575
+    RelativePosition = (MyChartsNo * 540)
+    TopPosition = 35 + RelativePosition
+    
+    ActiveSheet.Shapes.AddChart2(201, xlColumnClustered, LeftPosition, TopPosition).Select
+    ActiveChart.ApplyChartTemplate ( _
+        "C:\Users\kyrremat\AppData\Roaming\Microsoft\Templates\Charts\Snitt_alder_2022.crtx")
+    ActiveChart.SetSourceData Source:=myRange
+    ActiveChart.DisplayValueNotAvailableAsBlank = True
+    
+    Call DiagramTittelOgDimensjon
+End Sub
+Sub DiagramSnittLønn()
+'
+' DiagramSnittLønn Macro
+'
+' Keyboard Shortcut: Ctrl+Shift+l
+'
+    Dim myRange As Range
+    Set myRange = Selection
+    
+    MyChartsNo = CInt(ActiveSheet.ChartObjects.Count) Mod 2
+    LeftPosition = 575
+    RelativePosition = (MyChartsNo * 540)
+    TopPosition = 35 + RelativePosition
+    
+    ActiveSheet.Shapes.AddChart2(201, xlColumnClustered, LeftPosition, TopPosition).Select
+    ActiveChart.ApplyChartTemplate ( _
+        "C:\Users\kyrremat\AppData\Roaming\Microsoft\Templates\Charts\Snitt_lønn_2022.crtx")
+    ActiveChart.SetSourceData Source:=myRange
+    ActiveChart.DisplayValueNotAvailableAsBlank = True
+    
+    Call DiagramTittelOgDimensjon
+End Sub
+Sub DiagramSnittDagerTilJobb()
+'
+' DiagramSnittDagerTilJobb Macro
+'
+' Keyboard Shortcut: Ctrl+Shift+d
+'
+    Dim myRange As Range
+    Set myRange = Selection
+    
+    MyChartsNo = CInt(ActiveSheet.ChartObjects.Count) Mod 2
+    LeftPosition = 575
+    RelativePosition = (MyChartsNo * 540)
+    TopPosition = 35 + RelativePosition
+    
+    ActiveSheet.Shapes.AddChart2(201, xlColumnClustered, LeftPosition, TopPosition).Select
+    ActiveChart.ApplyChartTemplate ( _
+        "C:\Users\kyrremat\AppData\Roaming\Microsoft\Templates\Charts\Snitt_dagertiljobb_2022.crtx")
+    ActiveChart.SetSourceData Source:=myRange
+    ActiveChart.DisplayValueNotAvailableAsBlank = True
+    
+    Call DiagramTittelOgDimensjon
+End Sub
+
+Sub DiagramTittelOgDimensjon()
+
+    Dim MyChart As Chart
+    'On Error Resume Next
+    Set MyCharts = ActiveSheet.ChartObjects
+    For i = 1 To MyCharts.Count
+        Set MyChart = MyCharts(i).Chart
+        With MyChart
+         .ChartTitle.Text = Range("A1")
+         .Parent.Height = 540
+         .Parent.Width = 960
+     End With
+    Next i
+
+End Sub
+
+Sub eksporterDiagramPPT()
+    ' Lånt her: https://www.encodedna.com/excel/export-multiple-charts-from-excel-worksheet-to-powerpoint-using-vba.htm
+    ' Create a PowerPoint application object.
+    Dim objPPT As PowerPoint.Application
+    Set objPPT = New PowerPoint.Application
+    objPPT.Visible = True           ' Make the PPT visible.
+    objPPT.Activate
+    
+    ' Create a PowerPoint presentation object.
+    Dim objPptPre As PowerPoint.Presentation
+    Set objPptPre = objPPT.Presentations.Add
+    
+    ' We'll show different charts in different slides in our PowerPoint presentation.
+    ' Therefore, create an object for PPT slides.
+    Dim objPPTSlides As PowerPoint.Slide
+    
+    Dim iNdx As Integer     ' Index, or position of each slide.
+    iNdx = 1
+    
+    Dim objChart As ChartObject
+    Dim objWS As Worksheet
+    
+    For Each objWS In ActiveWorkbook.Worksheets     ' Loop through all the worksheets.
+        For Each objChart In objWS.ChartObjects     ' Loop through all the Chart Objects.
+           
+            objChart.Chart.ChartArea.Copy       ' Copy all the charts to the Clipboard.
+            ' Debug.Print objChart.Chart.Name
+            
+            Set objPPTSlides = objPptPre.Slides.Add(iNdx, ppLayoutBlank)       ' Create a new slide with a blank layout.
+            objPPTSlides.Shapes.PasteSpecial ppPasteDefault, msoTrue           ' Extract the chart from the Clipboad and paste it.
+            
+            iNdx = iNdx + 1         ' Increment the slide index (or position).
+        Next objChart
+    Next objWS
+    
+End Sub
+Sub fjernFormateringBeholdFargar()
+    Dim cell As Range
+
+    For Each cell In Selection
+        cell.Interior.Color = cell.DisplayFormat.Interior.Color
+        cell.Font.Color = cell.DisplayFormat.Font.Color
+    Next
+
+    Selection.FormatConditions.Delete
+    
+End Sub
