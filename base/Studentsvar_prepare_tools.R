@@ -565,13 +565,25 @@ kople_studieprogramkode <- function(sdf, vis_samla_kode = T) {
         Studieprogramkode == "GVH" ~ "VERB+GVH",
         Studieprogramkode == "VERB" ~ "VERB+GVH",
         TRUE ~ Studieprogramkode))
+    # TODO legg til dei siste som variantar for samanslått kode 
   }
+  
   if (!vis_samla_kode) {
     sdf <- sdf %>% 
       mutate(Studieprogramkode = case_when(
         Studieprogramkode == "SPH" ~ "SYKK",
         Studieprogramkode == "SYPLGR" ~ "SYKP",
         Studieprogramkode == "GVH" ~ "VERB",
+        grepl("YLBAH|YLDHH|YLEFH|YLHSH|YLRMH|YLSSH|YLTIH", Studieprogramkode) ~ "YFLH",
+        grepl("YLSSN|YLBAN|YLEFN|YLTIN", Studieprogramkode) ~ "YFLN",
+        Studieprogramkode == "MJOUR" ~ "MEDUT",
+        Studieprogramkode == "MAERG" ~ "MERG",
+        Studieprogramkode == "MAFYS" ~ "MAMUS",
+        Studieprogramkode == "MAREHAB" ~ "MAHAB",
+        Studieprogramkode == "MAPO" ~ "MAEMP",
+        Studieprogramkode == "MASE" ~ "MAPHN",
+        Studieprogramkode == "MAPSYKHD4" ~ "MAPSY",
+        grepl("MASYKV|MASYKVD4", Studieprogramkode) ~ "MAKLI",
         TRUE ~ Studieprogramkode))
   }
   return(sdf)
@@ -1714,8 +1726,8 @@ OM_svart_fire_eller_fem_bin <- function(innvariabel) {
 ##* 
 OM_set_syklus <- function(sdf, nivåvariabel) {
   sdf <- sdf %>% mutate(Syklus = case_when(
-    grepl("AR|HN|LN", {{nivåvariabel}}) ~ "Andre",
-    grepl("B3|B4|HK|YU", {{nivåvariabel}}) ~ "Bachelor",
+    grepl("B4|HK|YU|AR|HN|LN", {{nivåvariabel}}) ~ "Andre",
+    grepl("B3", {{nivåvariabel}}) ~ "Bachelor",
     grepl("M2|ME|M5", {{nivåvariabel}}) ~ "Master",
     grepl("FU", {{nivåvariabel}}) ~ "Forskarutdanning",
     grepl("VS", {{nivåvariabel}}) ~ "Vidaregåande skule-nivå",
