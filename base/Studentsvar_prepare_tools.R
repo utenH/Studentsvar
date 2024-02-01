@@ -167,6 +167,29 @@ SB_prepare_2022 <- function(innfil, dataår, instnr) {
 } 
 
 ##* Studiebarometeret
+SB_prepare_2024 <- function(innfil, dataår, instnr, kopleprogramdata = T) {
+  OM <- read_excel(innfil)
+  OM <- OM %>% mutate(undersøkelse_år = dataår)
+  # I 2022 inneheldt datasettet nokre observasjonar utan studprog_kod/studiepgm_navn
+  # Filtrerer bort slike
+  OM <- OM %>% filter(!is.na(studprog_kod))
+  OM[OM==9999] <- NaN # Var NA, bytta 2020 for å skilje mellom ikkje-svar (NA) og Vet ikke (NaN)
+  OM <- SB_name_fak_kort(OM)
+  if (kopleprogramdata) {
+    if (instnr == 1175) {
+      # legg til programnamn med instituttilhøyrigheit
+      OM <- dbh_add_programdata(OM, "studprog_kod", instnr)
+      OM <- OM_add_programdata(OM, "Studieprogramkode")
+      OM <- SB_add_nivå(OM)
+    } else {
+      OM <- dbh_add_programdata(OM, "studprog_kod", instnr)
+    }
+  }
+  OM <- SB_add_sum_tid(OM)
+  OM <- SB_prep_indeks(OM)
+  return(OM)
+} 
+
 SB_prepare_2023 <- function(innfil, dataår, instnr, kopleprogramdata = T) {
   OM <- read_excel(innfil)
   OM <- OM %>% mutate(undersøkelse_år = dataår)
@@ -374,6 +397,7 @@ dbh_hent_programdata <- function(instnr = 1175) {
   dbh_vars <- c("Studieprogramkode", 
                 "Studieprogramnavn",
                 "Avdelingskode",
+                "Avdelingskode_SSB", # TODO heller bruke denne, trunkert til to siffer for fakultet, heile talet for institutt. Kan godt lagre til eiga fil som programvariablane
                 "Nivåkode", 
                 "Årstall", 
                 "Andel av heltid", 
@@ -749,9 +773,11 @@ SB_prep_indeks <- function(sdf) {
   sdf$mis_laerutb10 <- SB_add_countmiss(sdf, var_laerutb)
   sdf$indx_laerutb10[which(sdf$mis_laerutb10 > 3)] <- NA  
   
+  try(expr = {
   sdf$indx_medv3 <- SB_add_indx_m(sdf, var_medv)
   sdf$mis_medv3 <- SB_add_countmiss(sdf, var_medv)
   sdf$indx_medv3[which(sdf$mis_medv3 > 0)] <- NA  
+  }, silent = TRUE)
   
   # Endra i 2022
   try(expr = {
@@ -760,11 +786,18 @@ SB_prep_indeks <- function(sdf) {
   sdf$indx_insp3[which(sdf$mis_insp3 > 0)] <- NA  
   }, silent = TRUE)
   
-  # Endra i 2020
+  # # Endra i 2020, erstatta i 2024
+  # try(expr = {
+  #   sdf$indx_praksis6 <- SB_add_indx_m(sdf, var_praksis)
+  #   sdf$mis_praksis6 <- SB_add_countmiss(sdf, var_praksis)
+  #   sdf$indx_praksis6[which(sdf$mis_praksis6 > 2)] <- NA
+  # }, silent = TRUE)
+  
+  # Endra i 2024
   try(expr = {
-    sdf$indx_praksis6 <- SB_add_indx_m(sdf, var_praksis)
-    sdf$mis_praksis6 <- SB_add_countmiss(sdf, var_praksis)
-    sdf$indx_praksis6[which(sdf$mis_praksis6 > 2)] <- NA
+    sdf$indx_praksis7 <- SB_add_indx_m(sdf, var_praksis)
+    sdf$mis_praksis7 <- SB_add_countmiss(sdf, var_praksis)
+    sdf$indx_praksis7[which(sdf$mis_praksis7 > 3)] <- NA
   }, silent = TRUE)
   
   try(expr = {
@@ -2070,6 +2103,7 @@ var_tidsbruk <- c(
 # )
 # Praksis - endra i 2020
 var_praksis <- c(
+  "praksis_inf_19", # lagt til 2024 for å levere tal til Styringsportalen
   "praksis_forber_14",
   "praksis_passetinn_19",
   "praksis_veil_20",

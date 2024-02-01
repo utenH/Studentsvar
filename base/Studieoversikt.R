@@ -1,6 +1,151 @@
 options(dplyr.summarise.inform = FALSE)
-# options(OutDec = ",")
-# options("openxlsx.numFmt" = "#,#0.00")
+
+indikator_plott_OM <- function(datasett) {
+  datasett <- datasett %>% filter(!is.na(Fakultetsnavn) | !is.na(Institutt) | !is.na(Nivåkode))
+  altialt_tilfreds <- datasett  %>% group_by(Studieprogramkode) %>% 
+    summarise(Tilfreds = mean(overord_altialt_13, na.rm = T)) %>%
+    left_join(., select(datasett, Fakultetsnavn, Institutt, Nivåkode, Syklus, Studietilbod, Studieprogramkode, Møtt_2022), by = "Studieprogramkode") %>%
+    mutate(Fakultet = factor(Fakultetsnavn), Tilfredshet = round(Tilfreds, 2)) %>% 
+    rename("Møtt 2022" = Møtt_2022)
+  
+  # Lag en delt data frame med crosstalk
+  delt_datasett <- SharedData$new(altialt_tilfreds)
+  
+  # Opprett en filter-widget for Syklus
+  filter_widget <- filter_checkbox(id = "filter", label = "Velg Syklus", sharedData = delt_datasett, group = ~Syklus)
+  
+  # Opprett ggplot
+  p <- ggplot(delt_datasett, aes(x = Tilfredshet, y = `Møtt 2022`, color = Fakultet, size = `Møtt 2022`,
+                                 text = paste("Studium:", Studietilbod, "<br>",
+                                              "Nivå:", Nivåkode, "<br>",
+                                              "Alt i alt tilfreds: ", Tilfreds, "<br>",
+                                              "Fakultet: ", Fakultet, "<br>",
+                                              "Møtt 2022: ", `Møtt 2022`))) + geom_point()
+  
+  # Konverter ggplot til plotly
+  p <- ggplotly(p)
+  
+  # Kombiner filter-widget og plot i en bscols objekt
+  bs <- bscols(filter_widget, p)
+  bs <- tagList()
+  # Lagre bscols objekt som en HTML-fil
+  saveWidget(bs, file = "my_plot.html")
+  return(bs)
+  
+  # Sett opp et crosstalk-filter basert på en variabel utenfor plottet
+  altialt_tilfreds <- SharedData$new(altialt_tilfreds)
+  
+  p <- ggplot(data = altialt_tilfreds, 
+              aes(x = Tilfreds, y = `Møtt 2022`, color = Fakultet, size = `Møtt 2022`,
+                  text = paste("Studium:", Studietilbod, "<br>",
+                               "Nivå:", Nivåkode, "<br>",
+                               "Alt i alt tilfreds: ", Tilfreds, "<br>",
+                               "Fakultet: ", Fakultet, "<br>",
+                               "Møtt 2022: ", `Møtt 2022`)
+              )
+  ) + geom_point() + xlim(1, 5) + ylim(1, 500) #+ theme_gdocs()
+    # geom_jitter(width = 0.3, height = 0.3)
+  
+  # p <- p %>% ggplotly(p, dynamicTicks = FALSE)
+  # p <- p %>% layout(height = "700")
+  # p <- p + coord_fixed(ratio = 1/100,  xlim = c(1, 5), ylim = c(1, 500))
+  
+  # p <- ggplotly(p, tooltip = "text", source = "filter", dynamicTicks = FALSE)
+  
+  # altialt_widgets <- bscols(
+  #   filter_checkbox("id", "Filtrer på nivå", altialt_tilfreds, ~Syklus),
+  #   ggplotly(p, dynamicTicks = FALSE),
+  #   widths = c(12, 12)
+  # )
+  
+  altialt_widgets <- tagList(
+    filter_checkbox("id", "Filtrer på nivå", altialt_tilfreds, ~Syklus),
+    ggplotly(p, dynamicTicks = FALSE)
+  )
+  
+  altialt_widgets
+  
+  altialt_filter <- filter_checkbox("altialt", "Filtrer på nivå", altialt_tilfreds, ~Syklus)
+  altialt_plot <- ggplotly(p, tooltip = "text", dynamicTicks = FALSE)
+
+  # altialt_widgets <- tagList(altialt_filter, altialt_plot)
+  altialt_filter
+  saveWidget(altialt_plot, file = "altialttilfreds.html", selfcontained = TRUE)
+  # Oppdater filtrert datasett basert på filterkontrollen
+  # observeEvent(input$filter, {
+  #   altialt_tilfreds$setFilter(Syklus %in% input$filter)
+  # })
+
+  # Opprett et plotlyWidget som kombinerer plottet og filterkontrollen
+  # p <- plotl("ggplotlyPlot", p, filter_kontroll)
+  
+  # # Legg til nedtrekksmeny for filtrering
+  # p <- p %>% layout(
+  #   updatemenus =
+  #     list(
+  #       list(
+  #         buttons = list(
+  #           list(method = "restyle",
+  #                args = list("visible", list(TRUE, FALSE)),
+  #                label = "Bachelor"),
+  #           list(method = "restyle",
+  #                args = list("visible", list(FALSE, TRUE)),
+  #                label = "Master"),
+  #           list(method = "restyle",
+  #                args = list("visible", list(TRUE, TRUE)),
+  #                label = "Alle")
+  #         ),
+  #         type = "buttons",
+  #         direction = "down",
+  #         showactive = TRUE,
+  #         active = 0
+  #       )
+  #     )
+  #   ,
+  #   yaxis = list(
+  #     tickmode = "array",
+  #     tickvals = unique(datasett$Syklus),
+  #     ticktext = c("Bachelor", "Master"),
+  #     rangemode = "tozero"
+  #   )
+  # )
+  
+  # saveWidget(p, file = "Rapportfiler/interaktivt_plot2.html")
+  # 
+  # p
+  
+  # 
+  # # Sett opp et crosstalk-filter basert på en variabel utenfor plottet
+  # mtcars_filter <- SharedData$new(mtcars)
+  # 
+  # # Generer ggplot-objektet med geom_jitter
+  # p <- ggplot(data = mtcars_filter, aes(x = mpg, y = disp, color = as.factor(cyl))) +
+  #   geom_jitter(width = 0.3, height = 0.3) +
+  #   labs(title = "MPG vs. Dispersion",
+  #        x = "MPG",
+  #        y = "Dispersion",
+  #        color = "Cylinders") +
+  #   theme_minimal()
+  # 
+  # # Konverter ggplot til plotly-objekt
+  # p_plotly <- ggplotly(p, source = "filter")
+  # 
+  # # Opprett en filterkontroll som ikke er synlig i plottet
+  # filter_control <- filter_select(input_id = "filter",
+  #                                 label = NULL,
+  #                                 vars = ~am,
+  #                                 data = mtcars,
+  #                                 multiple = TRUE,
+  #                                 inline = TRUE)
+  # 
+  # # Oppdater filtrert datasett basert på filterkontrollen
+  # observeEvent(input$filter, {
+  #   mtcars_filter$setFilter(am %in% input$filter)
+  # })
+  # 
+  # # Opprett et plotlyWidget som kombinerer plottet og filterkontrollen
+  # plotlyWidget("ggplotlyPlot", p_plotly, filter_control)
+}
 
 ##** 
 ##* Lagar tabellar med oversikt over studietilbod for siste tre år
@@ -76,7 +221,7 @@ SP_studietilbod_OM <- function(mal_fil = "malfiler/Studieoversikt_mal.docx", ut_
   nye_studentar_OM <- dbh_data(379, filters=c("Institusjonskode"="1175"), 
                                group_by=c("Institusjonskode", "Studieprogramkode", "Årstall", "Semester")) %>% 
     # Tar bort desse: Søknadsalternativer, `Tilbud om opptak`, `Akseptert tilbud`
-    select(Studieprogramkode, Årstall, Semester, Antall = `Møtt til studiestart` )
+    select(Studieprogramkode, Årstall, Semester, Antall = `Møtt til studiestart`)
 
   # Hentar registrerte personar i 3. syklus
   print("Hentar DBH-data om registrerte personar i 3. syklus")
@@ -113,7 +258,7 @@ SP_studietilbod_OM <- function(mal_fil = "malfiler/Studieoversikt_mal.docx", ut_
   # Slår saman med studieprogramvariablane
   studietilbod <- left_join(studietilbod, studentar_OM_pivot, "Studieprogramkode")
   
-  # Hentar data om fullførte studietibod i 1. og 2. syklus
+  # Hentar data om fullførte studietilbod i 1. og 2. syklus
   print("Hentar DBH-data om fullførte studietilbod i 1. og 2. syklus")
   fullfort_OM <- dbh_data(118, filters=c("Institusjonskode"="1175"), 
                             group_by=c("Institusjonskode", "Studieprogramkode", "Årstall", "Andel av heltid")) %>%

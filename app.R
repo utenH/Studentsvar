@@ -184,11 +184,11 @@ server <- function(input, output) {
     print(paste(surveyname, levelfilter, sep = " - " ))
     
     # TODO: legg inn case for å sjekke om ein skal bruke SA_prepare, SB_prepare eller OM_prepare
-    df <- SB_prepare_2023(input$nyastedata$datapath, input$nyastear, input$instnr)
+    df <- SB_prepare_2024(input$nyastedata$datapath, input$nyastear, input$instnr)
     print("Eventuelle programkoder utan Fakultetstilknytning: ") 
     print(df %>% filter(is.na(FAKNAVN)) %>% select(Studieprogramkode) %>% 
             unique)
-    df_previous <- SB_prepare_2023(input$forrigedata$datapath, input$forrigear, input$instnr)
+    df_previous <- SB_prepare_2024(input$forrigedata$datapath, input$forrigear, input$instnr)
     
     workbook <- OM_print_2023(survey = surveyname, source_df = df, source_df_forrige = df_previous,
                               malfil = templatepath, nivå = levelfilter)
