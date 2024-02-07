@@ -7,8 +7,8 @@ skrivvar <- function(sdf, variabel) {
 }
 
 ##* For å skrive ut tabell til utklippsbrett
-til_utklipp <- function(sdf, storleik = "", radnamn = F) {
-  sdf %>% write.table(paste("clipboard", storleik, sep = "-"), sep = "\t", row.names = radnamn, dec = ",")
+til_utklipp <- function(sdf, storleik = "", radnamn = F, na_streng = "NA") {
+  sdf %>% write.table(paste("clipboard", storleik, sep = "-"), sep = "\t", row.names = radnamn, dec = ",", na = na_streng)
   return(sdf)
 }
 
@@ -153,21 +153,9 @@ EXC_tabell_meirinfo <- function(sdf) {
   return(sdf)
 }
 
+###* 
 ##* Studiebarometeret
-SB_prepare_2022 <- function(innfil, dataår, instnr) {
-  OM <- read_excel(innfil)
-  # OM <- read.xlsx(innfil)
-  OM <- OM %>% mutate(undersøkelse_år = dataår)
-  OM[OM==9999] <- NaN # Var NA, bytta 2020 for å skilje mellom ikkje-svar (NA) og Vet ikke (NaN)
-  OM <- SB_name_fak_kort(OM)
-  OM <- dbh_add_programdata(OM, "studprog_kod", instnr)
-  OM <- SB_add_sum_tid(OM)
-  OM <- SB_prep_indeks(OM)
-  return(OM)
-} 
-
-##* Studiebarometeret
-SB_prepare_2024 <- function(innfil, dataår, instnr, kopleprogramdata = T) {
+SB_prepare_2024 <- function(innfil, dataår, instnr, kopleprogramdata = T, brukParaplykoder = FALSE) {
   OM <- read_excel(innfil)
   OM <- OM %>% mutate(undersøkelse_år = dataår)
   # I 2022 inneheldt datasettet nokre observasjonar utan studprog_kod/studiepgm_navn
@@ -175,6 +163,12 @@ SB_prepare_2024 <- function(innfil, dataår, instnr, kopleprogramdata = T) {
   OM <- OM %>% filter(!is.na(studprog_kod))
   OM[OM==9999] <- NaN # Var NA, bytta 2020 for å skilje mellom ikkje-svar (NA) og Vet ikke (NaN)
   OM <- SB_name_fak_kort(OM)
+  
+##* TODO legg til if (brukParaplykoder) { kople_studieprogramkode } før if (kopleprogramdata)
+  if (brukParaplykoder) {
+    OM <- OM_kople_paraplyprogram(OM, "studprog_kod")
+  }
+  
   if (kopleprogramdata) {
     if (instnr == 1175) {
       # legg til programnamn med instituttilhøyrigheit
@@ -185,11 +179,15 @@ SB_prepare_2024 <- function(innfil, dataår, instnr, kopleprogramdata = T) {
       OM <- dbh_add_programdata(OM, "studprog_kod", instnr)
     }
   }
+  OM <- OM_janei_bin_sane(OM, forstevalg_studprog_23)
+  OM <- SB_plan_fullføring(OM)
   OM <- SB_add_sum_tid(OM)
   OM <- SB_prep_indeks(OM)
   return(OM)
 } 
 
+##**
+##* Eldre versjonar av koden, tatt vare på for å kunne reprodusere eldre rapportar
 SB_prepare_2023 <- function(innfil, dataår, instnr, kopleprogramdata = T) {
   OM <- read_excel(innfil)
   OM <- OM %>% mutate(undersøkelse_år = dataår)
@@ -212,6 +210,39 @@ SB_prepare_2023 <- function(innfil, dataår, instnr, kopleprogramdata = T) {
   OM <- SB_prep_indeks(OM)
   return(OM)
 } 
+
+##* Studiebarometeret
+SB_prepare_2022 <- function(innfil, dataår, instnr) {
+  OM <- read_excel(innfil)
+  # OM <- read.xlsx(innfil)
+  OM <- OM %>% mutate(undersøkelse_år = dataår)
+  OM[OM==9999] <- NaN # Var NA, bytta 2020 for å skilje mellom ikkje-svar (NA) og Vet ikke (NaN)
+  OM <- SB_name_fak_kort(OM)
+  OM <- dbh_add_programdata(OM, "studprog_kod", instnr)
+  OM <- SB_add_sum_tid(OM)
+  OM <- SB_prep_indeks(OM)
+  return(OM)
+} 
+
+##** 
+##* For å handtere paraplyprogram og andre program samla
+OM_kople_paraplyprogram <- function(sdf, innvariabel, erstatt_kode = TRUE) {
+  paraplykoder <- OM_hent_paraplykoder() %>% select(Paraplyvennleg_kode, Studieprogramkode)
+  sdf <- left_join(sdf, paraplykoder,
+                   by = setNames("Studieprogramkode", innvariabel)) 
+                   # by = "Studieprogramkode") 
+  sdf <- sdf %>% 
+    mutate(Paraplyvennleg_kode = coalesce(Paraplyvennleg_kode, !!innvariabel))
+  if (erstatt_kode) {
+    sdf <- sdf %>% mutate(!!innvariabel := Paraplyvennleg_kode)
+  }
+  return(sdf)
+}
+
+OM_hent_paraplykoder <- function() {
+  paraplykoder <- read_excel("base/OsloMet_paraplyprogram.xlsx")
+  return(paraplykoder)
+}
 
 ##** Funksjon som tar spesialtilfelle i Studiebarometeret
 ##*  Andre datasett må vere vaska først
@@ -397,7 +428,6 @@ dbh_hent_programdata <- function(instnr = 1175) {
   dbh_vars <- c("Studieprogramkode", 
                 "Studieprogramnavn",
                 "Avdelingskode",
-                "Avdelingskode_SSB", # TODO heller bruke denne, trunkert til to siffer for fakultet, heile talet for institutt. Kan godt lagre til eiga fil som programvariablane
                 "Nivåkode", 
                 "Årstall", 
                 "Andel av heltid", 
@@ -765,9 +795,9 @@ SB_prep_indeks <- function(sdf) {
   sdf$mis_organ4 <- SB_add_countmiss(sdf, var_organ)
   sdf$indx_organ4[which(sdf$mis_organ4 > 1)] <- NA  
   
-  sdf$indx_vurd5 <- SB_add_indx_m(sdf, var_vurd)
-  sdf$mis_vurd5 <- SB_add_countmiss(sdf, var_vurd)
-  sdf$indx_vurd5[which(sdf$mis_vurd5 > 1)] <- NA  
+  sdf$indx_vurd4 <- SB_add_indx_m(sdf, var_vurd)
+  sdf$mis_vurd4 <- SB_add_countmiss(sdf, var_vurd)
+  sdf$indx_vurd4[which(sdf$mis_vurd4 > 1)] <- NA  
   
   sdf$indx_laerutb10 <- SB_add_indx_m(sdf, var_laerutb)
   sdf$mis_laerutb10 <- SB_add_countmiss(sdf, var_laerutb)
@@ -825,6 +855,36 @@ SB_prep_indeks <- function(sdf) {
   }, silent = TRUE)
   
   return(sdf)
+}
+
+##**
+##* Omkodar spørsmål om studentane sin plan for fullføring av studiet
+##* Koding i datasett:
+##* 1 (Jeg planlegger å gjennomføre hele studieprogrammet på den tiden som er angitt i studieplanen)
+##* 2 (Jeg planlegger å gjennomføre hele studieprogrammet, men vil bruke mer tid enn det som er angitt i studieplanen)
+##* 3 (Jeg planlegger å gjennomføre hele studieprogrammet raskere enn tiden som er angitt i studieplanen)
+##* 4 (Jeg planlegger å ikke gjennomføre hele studieprogrammet)
+##* 5 (Jeg har fullført studieprogrammet)
+##* 6 (Jeg har sluttet på studieprogrammet)
+##* 9999 (Annet / Vet ikke)
+##* Ny koding:
+##* 1 - Planlegg å fullføre (slått saman av alt. 1, 2, 3 og 5)
+##* 0 - Planlegg ikkje å fullføre (alt. 4 og 6)
+##* NaN - Anna / Veit ikkje
+SB_plan_fullføring <- function(sdf) {
+  if ("plan_gjennomforing_23" %!in% colnames(sdf)) {
+    sdf <- sdf %>% mutate(plan_gjennomforing_23 = NA)
+    return(sdf)
+  }
+  sdf <- sdf %>% mutate(plan_gjennomforing_23_omkoda = case_when(
+    plan_gjennomforing_23 == 1 |
+      plan_gjennomforing_23 == 2 |
+      plan_gjennomforing_23 == 3 |
+      plan_gjennomforing_23 == 5 ~ 1, 
+    plan_gjennomforing_23 == 4 |
+    plan_gjennomforing_23 == 6 ~ 0,
+    plan_gjennomforing_23 == 9999 ~ NaN
+  ))
 }
 
 ##** Kandidatundersøkelsen - hjelpefunksjonar for å rydde og slå saman data til tidsserie
@@ -1663,7 +1723,7 @@ OM_set_faktor_studerer_niva <- function(sdf, variabel) {
 ##*  svar = variabelen som skal tolkast
 OM_janei_bin <- function(sdf, svar) {
   if (!(deparse(substitute(svar)) %in% colnames(sdf))) {
-    sdf <- sdf %>% mutate({{svar}} := NaN)
+    sdf <- sdf %>% mutate({{svar}} := NA)
     return(sdf)
   }
   sdf <- sdf %>% mutate({{svar}} := case_when(
@@ -1696,6 +1756,19 @@ OM_janei_bin_nyvar <- function(sdf, nyvar, svar) {
     grepl("Do not know", {{svar}}) ~ NaN,
     grepl("Usikker", {{svar}}) ~ NaN,
     grepl("Uncertain", {{svar}}) ~ NaN
+  ))
+}
+
+##**
+##* Kodar om Ja/Nei-variabel frå Ja=1, Nei=2 til Ja=1, Nei=0
+OM_janei_bin_sane <- function(sdf, svar) {
+  if (!(deparse(substitute(svar)) %in% colnames(sdf))) {
+    sdf <- sdf %>% mutate({{svar}} := NA)
+    return(sdf)
+  }
+  sdf <- sdf %>% mutate({{svar}} := case_when(
+    {{svar}} == 1 ~ 1,
+    {{svar}} == 2 ~ 0
   ))
 }
 

@@ -35,7 +35,7 @@ ui <- fluidPage(
                            textInput("nyastear", "Årstall for nyaste undersøking"),
                            fileInput("forrigedata", "Rådatafil forrige undersøking"),
                            textInput("forrigear", "Årstall for forrige undersøking"),
-                           
+                           checkboxInput("paraplyprogram", "Bruk paraplyprogramkoder", value = FALSE, width = NULL),
                            downloadButton("downloadData", "Lagre fil")      
                          ),
                          
@@ -171,24 +171,27 @@ server <- function(input, output) {
     
   })
   
+  ##**
+  ##* Bygger rekneark med gjennomsnitt for valde variablar, med ei fane per fakultet
   # Lagar arbeidsbokobjekt
   workbook <- reactive({
     if (is.null(input$nyastedata)) return()
     if (!is.null(input$malfil)) {
       templatepath <- input$malfil$datapath
     } else {
-      templatepath <- "malfiler/Studiebarometeret_2023_vars.xlsx"
+      templatepath <- "malfiler/Studiebarometeret_2024_vars.xlsx"
     }
     surveyname <- input$surveyname
     levelfilter <- input$levelfilter
-    print(paste(surveyname, levelfilter, sep = " - " ))
+    paraplyprogram <- input$paraplyprogram
+    print(paste("Undersøking:", surveyname, "– Nivå:", levelfilter, "– Bruk paraplyprogramkoder:", paraplyprogram, sep = " " ))
     
     # TODO: legg inn case for å sjekke om ein skal bruke SA_prepare, SB_prepare eller OM_prepare
-    df <- SB_prepare_2024(input$nyastedata$datapath, input$nyastear, input$instnr)
+    df <- SB_prepare_2024(input$nyastedata$datapath, input$nyastear, input$instnr, brukParaplykoder = paraplyprogram)
     print("Eventuelle programkoder utan Fakultetstilknytning: ") 
     print(df %>% filter(is.na(FAKNAVN)) %>% select(Studieprogramkode) %>% 
             unique)
-    df_previous <- SB_prepare_2024(input$forrigedata$datapath, input$forrigear, input$instnr)
+    df_previous <- SB_prepare_2024(input$forrigedata$datapath, input$forrigear, input$instnr, brukParaplykoder = paraplyprogram)
     
     workbook <- OM_print_2023(survey = surveyname, source_df = df, source_df_forrige = df_previous,
                               malfil = templatepath, nivå = levelfilter)

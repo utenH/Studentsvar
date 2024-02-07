@@ -61,6 +61,56 @@ OM_fritekst_xlsx_2022 <- function(sdf, fritekstvariabler, grupperingsvariabel, s
   return(arbeidsboker)
 }
 
+##**
+##* Studiebarometeret til Styringsportalen
+SB_til_hypergene <- function(datasett, utklipp = T, utklippsstorleik = 256) {
+  # Grupperingsvariablar: 
+  # Studieprogram_instnamn/"Alle"	
+  # Fakultet/"OsloMet"	
+  # Variablar:
+  # Årstall,	Nivå,	sum(!is.na(overord_altialt_13))	indx_psymiljo3	indx_underv4	indx_tilbveil4	indx_organ4	indx_praksis7	indx_laerutb10	overord_altialt_13
+  # Kolonneoverskrifter:
+  # BarometerProgram	Enhet	Årstall	Nivå	Antall_Svarende	Studie_Læringsmiljø	Undervisning	Faglig_veiledning	Organisering	Praksis	Læringsutbytte	Overordnet_Tilfredshet
+  
+  if ("medvirk_innspill_18" %!in% colnames(datasett)) {
+    datasett <- datasett %>% mutate(medvirk_innspill_18 = NA)
+  }
+  
+  summering <- function(sdf) {sdf %>% summarise(
+    Antall_Svarende = sum(!is.na(overord_altialt_13)),
+    Studie_Læringsmiljø = mean(indx_psymiljo3, na.rm = T),
+    Undervisning = mean(indx_underv4, na.rm = T),
+    Faglig_veiledning = mean(indx_tilbveil4, na.rm = T),
+    Organisering = mean(indx_organ4, na.rm = T),
+    Praksis = mean(indx_praksis7, na.rm = T),
+    Læringsutbytte = mean(indx_laerutb10, na.rm = T),
+    Overordnet_Tilfredshet = mean(overord_altialt_13, na.rm = T),
+    Medvirkning = mean(medvirk_innspill_18, na.rm = T)
+  )}
+  
+  # OsloMet
+  SB_OsloMet <- datasett %>% group_by(BarometerProgram = "Alle", Enhet = "OsloMet", Årstall = undersøkelse_år, Nivå) %>% summering(.)
+  
+  # Fakultet
+  SB_fakultet <- datasett %>% group_by(BarometerProgram = "Alle", Enhet = fakultet, Årstall = undersøkelse_år, Nivå) %>% summering(.)
+  SB <- bind_rows(SB_OsloMet, SB_fakultet)
+  
+  # Studieprogram
+  SB_studieprogram <- datasett %>% group_by(BarometerProgram = Studieprogram_instnamn, Enhet = fakultet, Årstall = undersøkelse_år, Nivå) %>% summering(.)
+  SB <- bind_rows(SB, SB_studieprogram)
+  
+  # Paraplyprogram
+  paraplykoder <- OM_hent_paraplykoder() %>% select(Studieprogramkode, Paraplyvennleg_kode, Paraplynamn)
+  SB_paraply <- left_join(datasett, paraplykoder, by = "Studieprogramkode") %>% filter(!is.na(Paraplyvennleg_kode))
+  SB_paraply <- SB_paraply %>% group_by(BarometerProgram = Paraplynamn, Enhet = fakultet, Årstall = undersøkelse_år, Nivå) %>% summering(.)
+  
+  SB <- bind_rows(SB, SB_paraply)
+  if (utklipp) {
+    SB %>% til_utklipp(na_streng = "")
+  }
+  SB
+}
+
 ##** Skriv ut statistikk per variabel - basert på Kandidatundersøkinga
 ##*
 OM_indikator_print_2023 <- function(sdf, malfil = "", survey = "test", aggregert = F) {
@@ -2362,7 +2412,9 @@ SB_sub_print <- function(utd_df, fak_df, source_df,
   tmp_OM_df_prev <- source_df_forrige
   # Dersom det er tidsvariablar, må det handterast spesielt
   if (tid) {
-    tmp_utd_df <- tmp_utd_df %>% filter(!is.na(tid_brutto))
+    # 2024 la til progresjon == max(progresjon) for å kunne slå saman nokre program på tvers av
+    # heiltid og deltid
+    tmp_utd_df <- tmp_utd_df %>% filter(!is.na(tid_brutto), progresjon == max(progresjon))
     tmp_fak_df <- tmp_fak_df %>% filter(progresjon == 1, !is.na(tid_brutto))
     tmp_OM_df <- tmp_OM_df %>% filter(progresjon == 1, !is.na(tid_brutto))
   }
@@ -2413,8 +2465,10 @@ SB_utrad_snitt <- function(sdf, sdf_previous, spørsmål, varnamn) {
                              N = sum(!is.na(.data[[varnamn]]))
   ) %>% as.data.frame()
   
-  # TODO få inn trycatch her - eller kanskje bind_rows løyser problemet med manglande variablar?
-  # - vurder om det blir betre å bruke bind_rows datasett
+  # Legg til tom kolonne om variabelen manglar
+  if (varnamn %!in% colnames(sdf_previous)) {
+    sdf_previous <- sdf_previous %>% mutate(!!varnamn := NA)
+  }
   df_ut_previous <- sdf_previous %>%
     summarise(snitt_prev = mean(.data[[varnamn]], na.rm = T))
   df_ut <- suppressMessages(left_join(df_ut, df_ut_previous))
