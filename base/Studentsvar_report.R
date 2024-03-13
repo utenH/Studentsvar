@@ -9,6 +9,9 @@ OM_fritekst_xlsx_2022 <- function(sdf, fritekstvariabler, grupperingsvariabel, s
   tabell_stil <- createStyle(wrapText = T, valign = "top")
   svarkol_stil <- createStyle(numFmt = "TEXT")
   
+  sum_svar_datasett <- nrow(sdf)
+  sum_svar_delt <- 0
+  
   # Fjerne linjeskift, dei lagar krøll i utskrift til xlsx
   sdf <- sdf %>% mutate(across(where(is.character), ~gsub("\r\n", " ", .)))
   
@@ -17,7 +20,7 @@ OM_fritekst_xlsx_2022 <- function(sdf, fritekstvariabler, grupperingsvariabel, s
   arbeidsboker <- list()
   
   surveyinfo <- paste(surveynamn, "fritekst", data_ar)
-  dir.create(surveyinfo)
+  dir.create(paste0("Rapportfiler/", surveyinfo))
   
   for (gruppe in sdf) {
     gruppenamn <- gruppe[{{grupperingsvariabel}}] %>% unique() %>% as.character()
@@ -42,11 +45,13 @@ OM_fritekst_xlsx_2022 <- function(sdf, fritekstvariabler, grupperingsvariabel, s
     # print("OK3")
     writeDataTable(arbeidsbok, 1, gruppe)
     
+    tal_svar <- nrow(gruppe)
+    sum_svar_delt <- sum_svar_delt + tal_svar
     ## stil
-    datalengde <- NROW(gruppe) + 1
+    datalengde <- tal_svar + 1
     databreidde <- ncol(gruppe)
     # TODO Finn ein måte å bestemme dette frå Shiny-appen
-    setColWidths(arbeidsbok, 1, cols = 1:11, widths = c(12, 30, 60, 60, 60, 60, 60, 60, 60, 60, 60))
+    setColWidths(arbeidsbok, 1, cols = 1:11, widths = c(30, 12, 60, 60, 60, 60, 60, 60, 60, 60, 60))
     # addStyle(arbeidsbok, 1, cols = 5, rows = 2:datalengde, svarkol_stil, gridExpand = T, stack = T)
     addStyle(arbeidsbok, 1, cols = 1:databreidde, rows = 1:datalengde, tabell_stil, gridExpand = T, stack = T)
     # print("OK4")
@@ -54,16 +59,19 @@ OM_fritekst_xlsx_2022 <- function(sdf, fritekstvariabler, grupperingsvariabel, s
     ## Save workbook
     # TODO gjer om slik at utskrift skjer i anna funksjon
     saveWorkbook(wb = arbeidsbok,
-                 file = paste0(surveyinfo, "/", gruppenamn, " ",  surveynamn, " ", data_ar, ".xlsx"),
+                 file = paste0("Rapportfiler/", surveyinfo, "/", gruppenamn, " ",  surveynamn, " ", data_ar, ".xlsx"),
                  overwrite = TRUE)
     arbeidsboker <- append(arbeidsboker, arbeidsbok)
   }
+  print(paste("Samla tal på svar i splitta filer:", sum_svar_delt))
+  print(paste("Samla tal på svar i datasettet:", sum_svar_datasett))
+  if (sum_svar_datasett != sum_svar_delt) print("OBS – NOKRE SVAR HAR GÅTT TAPT ETTER DELING")
   return(arbeidsboker)
 }
 
 ##**
 ##* Studiebarometeret til Styringsportalen
-SB_til_hypergene <- function(datasett, utklipp = T, utklippsstorleik = 256) {
+SB_til_hypergene <- function(datasett, utklipp = T, utklippsstorleik = "") {
   # Grupperingsvariablar: 
   # Studieprogram_instnamn/"Alle"	
   # Fakultet/"OsloMet"	
@@ -106,7 +114,7 @@ SB_til_hypergene <- function(datasett, utklipp = T, utklippsstorleik = 256) {
   
   SB <- bind_rows(SB, SB_paraply)
   if (utklipp) {
-    SB %>% til_utklipp(na_streng = "")
+    SB %>% til_utklipp(na_streng = "", storleik = utklippsstorleik)
   }
   SB
 }
@@ -1074,8 +1082,8 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
   #* ta bort dei utan fakultet
   #* ta bort program som ikkje er i source_df frå source_df_forrige
   # Tar bort tredjeåret, for å ha likt samanlikningsgrunnlag
-  source_df <- source_df %>% filter(!is.na(FAKNAVN), STUDIEAR != 3 | is.na(STUDIEAR))
-  source_df_forrige <- source_df_forrige %>% filter(!is.na(FAKNAVN), STUDIEAR != 3 | is.na(STUDIEAR))
+  source_df <- source_df %>% filter(!is.na(FAKNAVN), STUDIEAR != 3, !is.na(STUDIEAR))
+  source_df_forrige <- source_df_forrige %>% filter(!is.na(FAKNAVN), STUDIEAR != 3, !is.na(STUDIEAR))
   
   # Kan brukast for å samanlikne andreåret mot dei på tredjeåret
   # source_df <- source_df %>% filter(!is.na(FAKNAVN), STUDIEAR != 3)
@@ -1141,7 +1149,7 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
     
     addWorksheet(ab, sheetName = strtrim(fak_df[1,]$FAKNAVN, 30))
     writeData(ab, sheet = sn, x = utskriftsmal[1, "Blokkoverskrift"], startCol = sc, startRow = 1, colNames = FALSE)
-    writeData(ab, sheet = sn, x = paste(nivå, fak, sep = " - "), startCol = sc, startRow = 2, colNames = FALSE)
+    writeData(ab, sheet = sn, x = paste(nivå, fak, sep = " – "), startCol = sc, startRow = 2, colNames = FALSE)
     
     # Første rad - program/fakultet/OM for alle blokkene
     uthevkol <- c(sc)
@@ -1415,6 +1423,31 @@ OM_print_2023 <- function(survey, source_df, source_df_forrige, malfil = "", niv
   return(ab)
 } # END OM_print_2023
 
+OM_tredeltskala_tidsserie <- function(variabel, nyvariabel) {
+  fil_bane1 <- "../datafiler/studiebarometeret/SB"
+  fil_bane2 <- "_Rådata.xlsx"
+  
+  årstall <- (2018:2023)
+  årstall <- (2022)
+  
+  datasett <- NULL
+  
+  for (x in årstall) {
+    innfil <- paste0(fil_bane1, x, fil_bane2)
+    print(innfil)
+    SB <- SB_prepare_2024(innfil, x, 1175, brukParaplykoder = T) %>%
+      select(undersøkelse_år, Studieprogramkode, Studieprogram_instnamn, STUDIEAR, Nivå, bama, fakultet, Institutt, {{variabel}})
+    # datasett_liste <- append(datasett_liste, SB)
+    # datasett_liste[[length(datasett_liste) + 1]] <- SB
+    datasett <- bind_rows(datasett, SB)
+  }
+  datasett <- datasett %>% filter(!is.na(STUDIEAR), STUDIEAR != 3)
+  datasett <- OM_likert5_til_tredelt_faktor(datasett, {{variabel}}, {{nyvariabel}})
+  return(datasett)
+  
+  # SB_serie_test %>% filter(Nivå == "Bachelor") %>%  select(`Overordnet tilfredshet`, undersøkelse_år) %>% table %>% prop.table(margin = 2) %>% til_utklipp(radnamn = T)
+  # SB_serie_test %>% filter(Nivå == "Master") %>%  select(`Overordnet tilfredshet`, undersøkelse_år) %>% table %>% prop.table(margin = 2) %>% til_utklipp(radnamn = T)
+}
 
 # Datapakke til kvalitetsrapport --------------------------------------------------------------
 
@@ -2412,9 +2445,9 @@ SB_sub_print <- function(utd_df, fak_df, source_df,
   tmp_OM_df_prev <- source_df_forrige
   # Dersom det er tidsvariablar, må det handterast spesielt
   if (tid) {
-    # 2024 la til progresjon == max(progresjon) for å kunne slå saman nokre program på tvers av
+    # 2024 la til slice_max(progresjon) for å kunne slå saman nokre program på tvers av
     # heiltid og deltid
-    tmp_utd_df <- tmp_utd_df %>% filter(!is.na(tid_brutto), progresjon == max(progresjon))
+    tmp_utd_df <- tmp_utd_df %>% filter(!is.na(tid_brutto)) %>% slice_max(progresjon)
     tmp_fak_df <- tmp_fak_df %>% filter(progresjon == 1, !is.na(tid_brutto))
     tmp_OM_df <- tmp_OM_df %>% filter(progresjon == 1, !is.na(tid_brutto))
   }
@@ -2464,6 +2497,11 @@ SB_utrad_snitt <- function(sdf, sdf_previous, spørsmål, varnamn) {
   df_ut <- sdf %>% summarise(snitt = mean(.data[[varnamn]], na.rm = T),
                              N = sum(!is.na(.data[[varnamn]]))
   ) %>% as.data.frame()
+  
+  # Minste tal på svar der vi skal vise resultat
+  min_svar <- 4  
+  # Skjermar resultat der tal på svar er for få
+  df_ut["snitt"][df_ut["N"] < min_svar] <- NA
   
   # Legg til tom kolonne om variabelen manglar
   if (varnamn %!in% colnames(sdf_previous)) {

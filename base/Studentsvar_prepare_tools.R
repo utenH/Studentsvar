@@ -164,15 +164,14 @@ SB_prepare_2024 <- function(innfil, dataår, instnr, kopleprogramdata = T, brukP
   OM[OM==9999] <- NaN # Var NA, bytta 2020 for å skilje mellom ikkje-svar (NA) og Vet ikke (NaN)
   OM <- SB_name_fak_kort(OM)
   
-##* TODO legg til if (brukParaplykoder) { kople_studieprogramkode } før if (kopleprogramdata)
-  if (brukParaplykoder) {
-    OM <- OM_kople_paraplyprogram(OM, "studprog_kod")
-  }
-  
   if (kopleprogramdata) {
     if (instnr == 1175) {
       # legg til programnamn med instituttilhøyrigheit
       OM <- dbh_add_programdata(OM, "studprog_kod", instnr)
+      if (brukParaplykoder) {
+        OM <- OM_kople_paraplyprogram(OM, "Studieprogramkode", erstatt_kode = T)
+      }
+      OM <- OM %>% kople_studieprogramkode(Studieprogramkode, vis_samla_kode = F)
       OM <- OM_add_programdata(OM, "Studieprogramkode")
       OM <- SB_add_nivå(OM)
     } else {
@@ -181,6 +180,7 @@ SB_prepare_2024 <- function(innfil, dataår, instnr, kopleprogramdata = T, brukP
   }
   OM <- OM_janei_bin_sane(OM, forstevalg_studprog_23)
   OM <- SB_plan_fullføring(OM)
+  OM <- OM_null_til_en_indeksering(OM, bruker_ki_23)
   OM <- SB_add_sum_tid(OM)
   OM <- SB_prep_indeks(OM)
   return(OM)
@@ -232,9 +232,9 @@ OM_kople_paraplyprogram <- function(sdf, innvariabel, erstatt_kode = TRUE) {
                    by = setNames("Studieprogramkode", innvariabel)) 
                    # by = "Studieprogramkode") 
   sdf <- sdf %>% 
-    mutate(Paraplyvennleg_kode = coalesce(Paraplyvennleg_kode, !!innvariabel))
+    mutate(Paraplyvennleg_kode = coalesce(Paraplyvennleg_kode, .data[[innvariabel]]))
   if (erstatt_kode) {
-    sdf <- sdf %>% mutate(!!innvariabel := Paraplyvennleg_kode)
+    sdf <- sdf %>% mutate({{innvariabel}} := Paraplyvennleg_kode)
   }
   return(sdf)
 }
@@ -250,7 +250,8 @@ SB_unntak <- function(sdf) {
   sdf$Fakultetsnavn[grepl("YFLH", sdf$Studieprogramkode)] <- "Fakultet for lærerutdanning og internasjonale studier (LUI)"
   sdf$Institutt[grepl("YFLH", sdf$Studieprogramkode)] <- "Institutt for yrkesfaglærerutdanning"
   sdf <- sdf %>% mutate(Studieprogramnavn = coalesce(Studieprogramnavn, studiepgm_navn))
-  sdf <- sdf %>% mutate(Nivåkode = coalesce(Nivåkode, STUDIENIVAKODE))
+  if ("STUDIENIVAKODE" %in% colnames(sdf))
+    sdf <- sdf %>% mutate(Nivåkode = coalesce(Nivåkode, STUDIENIVAKODE))
   return(sdf)
 }
 
@@ -280,7 +281,7 @@ SA_prepare_fritekst <- function(datafil) {
   # SA <- SB_name_institute(SA)
   # SA <- SA %>% rename("Programkode" = "studprog_kod")
   # SA <- dbh_add_programnavn(SA, "Programkode")
-  SA <- dbh_add_programdata(SA, "progkode", 1175)
+  SA <- dbh_add_programdata(SA, "progkode", "1175")
   print(SA %>% names)
   manglar_institutt <- SA %>% filter(is.na(Institutt)) %>% select(StudiumID) %>% unique
   if (manglar_institutt %>% nrow > 0){
@@ -395,13 +396,14 @@ dbh_add_programdata <- function(sdf, varnamn, instnr, natjoin = F) {
   }
   sdf <- sdf %>% rename("Studieprogramkode" = {{varnamn}})
   # Om det er Studiebarometer, må vi handtere nokre greier, sjekke her for å kunne kode StudiumID
-  if (instnr == 1175 & "STUDIENIVAKODE" %in% colnames(sdf)) {
+  if (instnr == "1175" & "FAKNAVN" %in% colnames(sdf)) {
     sdf <- SB_unntak(sdf)
   }
   
   sdf <- dbh_add_nivå(sdf)
   sdf <- dbh_add_utdtype(sdf)
   sdf <- dbh_add_progresjon(sdf, `Andel av heltid`)
+  sdf <- sdf %>% rename(progresjon = `Andel av heltid`)
   # TODO - vurder søk og fjern av
   # "Master i", Masterstudium i ", Master Programme in ", "Master's Degree Programme in "
   # "Bachelorstudium i ", "Bachelorstudium - " 
@@ -604,41 +606,52 @@ dbh_hent_studiepoengdata <- function(institusjonsnummer) {
   return(sdf)
 }
 
+dbh_hent_tilsette <- function() {
+  dbh_tilsette <- dbh_custom_data(225, vars_to_add = c("Ansettelse", "Stillingskode", "Stillingstype", "Årstall"), år = c("top", "7"))
+  dbh_tilsette <- left_join(dbh_tilsette, select(OM_hent_instituttliste(), Avdelingskode, Institutt), by="Avdelingskode")
+  return(dbh_tilsette)
+}
+
+OM_hent_instituttliste <- function() {
+  read_excel("base/OsloMet_instituttvariabler.xlsx", col_types = "text")
+  
+}
 ##** 
 ##* Kodar om Studieprogramkode, for å kunne vise eldre data saman med nytt program
 ##* vis_samla_kode gir moglegheit til å velje å vise berre nyaste studieprogramkode, eller samanslått
 ##* 
-kople_studieprogramkode <- function(sdf, vis_samla_kode = T) {
+kople_studieprogramkode <- function(sdf, programvariabel = Studieprogramkode, vis_samla_kode = T) {
   if (vis_samla_kode) {
     sdf <- sdf %>% 
-      mutate(Studieprogramkode = case_when(
-        Studieprogramkode == "SYKK" ~ "SYKK+SPH", 
-        Studieprogramkode == "SPH" ~ "SYKK+SPH",
-        Studieprogramkode == "SYKP" ~ "SYKP+SYPLGR", 
-        Studieprogramkode == "SYPLGR" ~ "SYKP+SYPLGR",
-        Studieprogramkode == "GVH" ~ "VERB+GVH",
-        Studieprogramkode == "VERB" ~ "VERB+GVH",
-        TRUE ~ Studieprogramkode))
+      mutate({{programvariabel}} := case_when(
+        {{programvariabel}} == "SYKK" ~ "SYKK+SPH", 
+        {{programvariabel}} == "SPH" ~ "SYKK+SPH",
+        {{programvariabel}} == "SYKP" ~ "SYKP+SYPLGR", 
+        {{programvariabel}} == "SYPLGR" ~ "SYKP+SYPLGR",
+        {{programvariabel}} == "GVH" ~ "VERB+GVH",
+        {{programvariabel}} == "VERB" ~ "VERB+GVH",
+        TRUE ~ {{programvariabel}}))
     # TODO legg til dei siste som variantar for samanslått kode 
   }
   
   if (!vis_samla_kode) {
     sdf <- sdf %>% 
-      mutate(Studieprogramkode = case_when(
-        Studieprogramkode == "SPH" ~ "SYKK",
-        Studieprogramkode == "SYPLGR" ~ "SYKP",
-        Studieprogramkode == "GVH" ~ "VERB",
-        grepl("YLBAH|YLDHH|YLEFH|YLHSH|YLRMH|YLSSH|YLTIH", Studieprogramkode) ~ "YFLH",
-        grepl("YLSSN|YLBAN|YLEFN|YLTIN", Studieprogramkode) ~ "YFLN",
-        Studieprogramkode == "MJOUR" ~ "MEDUT",
-        Studieprogramkode == "MAERG" ~ "MERG",
-        Studieprogramkode == "MAFYS" ~ "MAMUS",
-        Studieprogramkode == "MAREHAB" ~ "MAHAB",
-        Studieprogramkode == "MAPO" ~ "MAEMP",
-        Studieprogramkode == "MASE" ~ "MAPHN",
-        Studieprogramkode == "MAPSYKHD4" ~ "MAPSY",
-        grepl("MASYKV|MASYKVD4", Studieprogramkode) ~ "MAKLI",
-        TRUE ~ Studieprogramkode))
+      mutate({{programvariabel}} := case_when(
+        {{programvariabel}} == "SPH" ~ "SYKK",
+        {{programvariabel}} == "SYPLGR" ~ "SYKP",
+        {{programvariabel}} == "GVH" ~ "VERB",
+        grepl("YLBAH|YLDHH|YLEFH|YLHSH|YLRMH|YLSSH|YLTIH", {{programvariabel}}) ~ "YFLH",
+        grepl("YLSSN|YLBAN|YLEFN|YLTIN", {{programvariabel}}) ~ "YFLN",
+        {{programvariabel}} == "MJOUR" ~ "MEDUT",
+        {{programvariabel}} == "MAERG" ~ "MERG",
+        {{programvariabel}} == "MAFYS" ~ "MAMUS",
+        {{programvariabel}} == "MAREHAB" ~ "MAHAB",
+        {{programvariabel}} == "MAPO" ~ "MAEMP",
+        {{programvariabel}} == "MASE" ~ "MAPHN",
+        {{programvariabel}} == "MAPSYKHD4" ~ "MAPSY",
+        grepl("MASYKV|MASYKVD4", {{programvariabel}}) ~ "MAKLI",
+        grepl("MALKS|MALKD", {{programvariabel}}) ~ "MALK",
+        TRUE ~ {{programvariabel}}))
   }
   return(sdf)
 }
@@ -683,7 +696,7 @@ OM_studiestad <- function(sdf = NULL, eldste = 0) {
 # OM_fakultetsnavn
 # OM_fakultetskode
 OM_add_programdata <- function(sdf, varnamn) {
-  OM_programvar <- read_excel("base/OsloMet_programvariabler.xlsx")
+  OM_programvar <- read_excel("base/OsloMet_programvariabler.xlsx") %>% select(-progresjon)
   sdf <- left_join(sdf, OM_programvar,
                    by = setNames("Studieprogramkode", varnamn))
   sdf <- sdf %>% rename("Studieprogramkode" = !!varnamn)
@@ -990,7 +1003,7 @@ OM_compile_kandidat_data_2022 <- function(path, surveyyear, print = F, filename 
   sdf <- OM_clean_kandidat_serie(sdf)
   
   # Hentar programnamn frå dbh
-  sdf <- sdf %>% dbh_add_programdata("fs_kode", 1175)
+  sdf <- sdf %>% dbh_add_programdata("fs_kode", "1175")
   
   # Gruppere år i to
   sdf <- sdf %>% mutate(gruppe_ar = ifelse(undersokelse_ar < 2022,
@@ -1772,6 +1785,16 @@ OM_janei_bin_sane <- function(sdf, svar) {
   ))
 }
 
+##**
+##* Kodar om frå ordinal som startar på 0 til ordinal som startar på 1
+OM_null_til_en_indeksering <- function(sdf, svar) {
+  if (deparse(substitute(svar)) %!in% colnames(sdf)) {
+    sdf <- sdf %>% mutate({{svar}} := NA)
+    return(sdf)
+  }
+  sdf <- sdf %>% mutate({{svar}} := {{svar}} + 1)
+}
+
 ##** 
 ##* Kodar om frå tekst til faktor basert på variablar som inneheld tal
 ##* 
@@ -1842,6 +1865,21 @@ OM_set_syklus <- function(sdf, nivåvariabel) {
   return(sdf)
 }
 
+##**
+##* Lagar faktor av 5-delt skala - 5+4 -> Høg, 3 -> Middels, 2+1 -> låg
+OM_likert5_til_tredelt_faktor <- function(sdf, variabel, nyvariabel) {
+  nivå <- c("Låg", "Middels", "Høg")
+  sdf <- sdf %>% mutate({{nyvariabel}} := case_when({{variabel}} == 5 | 
+                                                      {{variabel}} == 4 ~ "Høg", 
+                                                    {{variabel}} == 3 ~ "Middels", 
+                                                    {{variabel}} == 2 | 
+                                                      {{variabel}} == 1 ~ "Låg"
+                                                    ))
+  sdf <- sdf %>% mutate({{nyvariabel}} := factor({{nyvariabel}},
+                                                 levels = nivå,
+                                                 labels = nivå))
+  return(sdf)
+}
 ##**
 ##* Til å lage binær variabel for dei to beste svaralternativa. 
 ##*

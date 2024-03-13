@@ -147,6 +147,21 @@ indikator_plott_OM <- function(datasett) {
   # plotlyWidget("ggplotlyPlot", p_plotly, filter_control)
 }
 
+##**
+##* For å dobbeltsjekke studiepoengproduksjon mot styringsportal/DBH
+dbh_studiepoengproduksjon <- function() {
+  sp_prod <- dbh_custom_data(900, "*")
+  dbh_programdata <- dbh_hent_programdata()
+  sp_prod <- sp_prod %>% rename(Studieprogramkode = `Progkode emne`)
+  sp_prod <- left_join(sp_prod, select(dbh_programdata, Studieprogramkode, Nivåkode), by="Studieprogramkode")
+  sp_prod %>% filter(!grepl("FU", Nivåkode), grepl("S", Studentkategori)) %>% 
+    group_by(Årstall) %>% summarise(sp = sum(`Ny produksjon egentfin`*60)) %>% as.data.frame()
+  
+  # dbh_123 <- dbh_custom_data(123, "Studentkategori")
+  # dbh_123 %>% filter(!grepl("FU|VS", Nivåkode), grepl("S|A", Studentkategori)) %>% group_by(Årstall) %>% mutate(htekv = `Andel av heltid`*`Prosent egenfinansiering`/100*`Antall totalt`/2) %>% summarise(sum(htekv)) %>% as.data.frame()
+  
+}
+
 ##** 
 ##* Lagar tabellar med oversikt over studietilbod for siste tre år
 ##* Kan skrive til Word, Excel eller returnere datasett
@@ -160,7 +175,7 @@ SP_studietilbod_OM <- function(mal_fil = "malfiler/Studieoversikt_mal.docx", ut_
   år_avgrensing_diagram <- 2018
   # år_avgrensing_diagram_øvre <- 2018
   år_avgrensing_tabellar <- 2021
-  måleår_tabell <- 2022
+  måleår_tabell <- 2023
   år_avgrensing_øvre <- 2023
   år_no <- 2023
   
@@ -284,7 +299,7 @@ SP_studietilbod_OM <- function(mal_fil = "malfiler/Studieoversikt_mal.docx", ut_
   fullfort_OM <- fullfort_OM %>% filter(Årstall >= år_avgrensing_tabellar)
   
   # Filterer bort dersom nyaste år ikkje skal vere med
-  fullfort_OM <- fullfort_OM %>% filter(Årstall < år_avgrensing_øvre)
+  fullfort_OM <- fullfort_OM %>% filter(Årstall <= år_avgrensing_øvre)
   
   # Lagar tabell med fullførte fordelt på år
   fullfort_OM_pivot <- fullfort_OM %>%
@@ -293,7 +308,7 @@ SP_studietilbod_OM <- function(mal_fil = "malfiler/Studieoversikt_mal.docx", ut_
   
   # Slår saman med studieprogramvariablane
   studietilbod <- left_join(studietilbod, fullfort_OM_pivot, "Studieprogramkode")
-  
+  return(studietilbod)
   ##** 
   ##* Legge til kolonnar for andel fullført normert tid
   normertandel_tilbod <- dbh_data(707, filters = list("Institusjonskode"=c("1175", "0257")))
@@ -507,8 +522,9 @@ SP_studietilbod_OM <- function(mal_fil = "malfiler/Studieoversikt_mal.docx", ut_
     #**
     #* Søylediagram andel heiltidsstudium per syklus
     sp_andel_heltid <- registrerte_OM %>% filter(Nivåkode != "VS", Nivåkode != "FU") %>%
-      mutate(Heltid = `Andel av heltid` == 1) %>%
-      group_by(Syklus, Årstall) %>% summarise("Andel heiltidsutdanning" = mean(Heltid, na.rm=T))
+      mutate(Heltid = `Andel av heltid` == 1) %>% group_by(Studieprogramkode, Syklus, Årstall) %>% 
+      summarise(Heltid_mean = mean(Heltid, na.rm = T)) %>% group_by(Syklus, Årstall) %>% 
+      group_by(Syklus, Årstall) %>% summarise("Andel heiltidsutdanning" = mean(Heltid_mean, na.rm=T))
     sp_bar_andel_heltid <- ms_barchart(sp_andel_heltid, x = "Syklus", y = "Andel heiltidsutdanning",
                                        group = "Årstall")
     sp_bar_andel_heltid <- sp_bar_andel_heltid %>% sp_bar_serie_format
@@ -518,8 +534,11 @@ SP_studietilbod_OM <- function(mal_fil = "malfiler/Studieoversikt_mal.docx", ut_
     #**
     #* Søylediagram andel studium med prakis per syklus
     sp_andel_praksis <- registrerte_OM  %>% filter(Nivåkode != "VS", Nivåkode != "FU") %>%
-      mutate(Praksis = `Andel praksis` > 0) %>%
-      group_by(Syklus, Årstall) %>% summarise("Andel utdanningar med praksis" = mean(Praksis, na.rm=T))
+      mutate(Praksis = `Andel praksis` > 0) %>% group_by(Studieprogramkode, Syklus, Årstall) %>% 
+      summarise(Praksis_mean = mean(Praksis, na.rm = T)) %>% group_by(Syklus, Årstall) %>% 
+      summarise("Andel utdanningar med praksis" = mean(Praksis_mean, na.rm=T))
+      # group_by(Syklus, Årstall) %>% summarise("Andel utdanningar med praksis" = mean(Praksis, na.rm=T))
+    # return(registrerte_OM  %>% filter(Nivåkode != "VS", Nivåkode != "FU"))
     sp_bar_andel_praksis <- ms_barchart(sp_andel_praksis, x = "Syklus", y = "Andel utdanningar med praksis",
                                        group = "Årstall")
     sp_bar_andel_praksis <- sp_bar_andel_praksis %>% sp_bar_serie_format
@@ -650,15 +669,15 @@ SP_studietilbod_OM <- function(mal_fil = "malfiler/Studieoversikt_mal.docx", ut_
     #   group_by(Syklus, Årstall) %>% summarise(K20 = mean(Oppfylt, na.rm = T))
     
     #* Søylediagram tal på studietilbod LN/HN
-    studietilbod_ikkjegrad_tidsserie <- registrerte_OM %>% filter(grepl("LN|HN", Nivåkode)) %>% 
-      group_by(Nivåkode, Årstall) %>% 
+    studietilbod_ikkjegrad_tidsserie <- registrerte_OM %>% filter(grepl("HN|LN", Nivåkode)) %>% 
+      group_by(Nivåkode, Årstall)%>% arrange(desc(Nivåkode)) %>% 
       summarise(Studietilbod = n())
     
     sp_bar_ikkjegrad_syklus <- ms_barchart(studietilbod_ikkjegrad_tidsserie,
                                               x = "Nivåkode", y = "Studietilbod",
                                               group = "Årstall")
     sp_bar_ikkjegrad_syklus <- sp_bar_ikkjegrad_syklus %>% sp_bar_serie_format
-    
+    # return(sp_bar_ikkjegrad_syklus)
     # Definere diagramstorleik
     diagram_w = 6.29
     diagram_h = 3.35
@@ -740,7 +759,7 @@ SP_studietilbod_OM <- function(mal_fil = "malfiler/Studieoversikt_mal.docx", ut_
     
     #** Side 4
     # Andel fullført normert tid
-    arbeidsbok <- body_add_par(arbeidsbok, "Andel fullført på normert tid i gradsgjevande heiltidssutdanningar", style = "heading 3")
+    arbeidsbok <- body_add_par(arbeidsbok, "Andel fullført på normert tid i gradsgjevande heiltidsutdanningar", style = "heading 3")
     arbeidsbok <- body_add_chart(arbeidsbok, sp_bar_normerttid, width = diagram_w, height = diagram_h, style = "caption")
     arbeidsbok <- body_add_par(arbeidsbok, "", style = "caption")
       
