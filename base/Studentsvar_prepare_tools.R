@@ -88,6 +88,8 @@ OM_prepare_exchangestudents_2023 <- function(innfil = "../datafiler/exchangestud
   OM <- OM %>% rename(Studietilbud = programnavn)
   OM <- OM %>% mutate(Studieprogram_instnamn = paste(Institutt, Studieprogramkode, Studietilbud))
   OM <- OM %>% mutate(Institusjon = "OsloMet")
+  OM <- OM %>% mutate(Fakultet_ar = paste(Fakultetsnavn, gruppe_ar))
+  OM <- OM %>% mutate(OM_ar = paste("OsloMet", gruppe_ar))
   
   # Omkoding
   svar_nivå <- c("1 – i liten grad", "2", "3", "4", "5 – i stor grad")

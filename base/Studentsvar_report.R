@@ -9,17 +9,22 @@ OM_fritekst_xlsx_2022 <- function(sdf, fritekstvariabler, grupperingsvariabel, s
   tabell_stil <- createStyle(wrapText = T, valign = "top")
   svarkol_stil <- createStyle(numFmt = "TEXT")
   
-  sum_svar_datasett <- nrow(sdf)
+  # Sjekkar kor mange svar det er i fritekstvariablane, for å kontrollere mot enkeltfilene
+  # Føreset at dei første tre kolonnane i datasettet er grupperingskolonnar
+  # (Fakultet, programkode, programnamn)
+  sdf <- sdf %>% group_by(!!grupperingsvariabel) %>% select(!!!fritekstvariabler)
+  sum_svar_datasett <- rowSums(!is.na(sdf[-(1:3)])) %>% sum
   sum_svar_delt <- 0
   
   # Fjerne linjeskift, dei lagar krøll i utskrift til xlsx
   sdf <- sdf %>% mutate(across(where(is.character), ~gsub("\r\n", " ", .)))
   
-  sdf <- sdf %>% group_by(!!grupperingsvariabel) %>% select(!!!fritekstvariabler) %>% group_split
+  sdf <- sdf %>% group_split
   print(sdf %>% length)
   arbeidsboker <- list()
   
   surveyinfo <- paste(surveynamn, "fritekst", data_ar)
+  tabname <- paste(surveynamn, data_ar)
   dir.create(paste0("Rapportfiler/", surveyinfo))
   
   for (gruppe in sdf) {
@@ -31,7 +36,7 @@ OM_fritekst_xlsx_2022 <- function(sdf, fritekstvariabler, grupperingsvariabel, s
     # print(gruppe %>% names %>% as.data.frame())
     # gruppe <- gruppe %>% filter(if_all(4:7, ~!is.na(.)))
     # TODO denne ser ut til å lage krøll
-    gruppe <- gruppe %>% filter(rowSums(!is.na(.)) > 2)
+    gruppe <- gruppe %>% filter(rowSums(!is.na(.)) < length(fritekstvariabler))
     not_all_na <- function(x) any(!is.na(x))
     gruppe <- gruppe %>% select_if(not_all_na)
     gruppe <- gruppe %>% mutate(across(where(is.character), str_trim))
@@ -41,17 +46,21 @@ OM_fritekst_xlsx_2022 <- function(sdf, fritekstvariabler, grupperingsvariabel, s
     gruppe <- gruppe %>% arrange(.data[[førstekolonne]])
     # print("OK2")
     arbeidsbok <- createWorkbook()
-    addWorksheet(arbeidsbok, surveyinfo)
+    addWorksheet(arbeidsbok, tabname)
     # print("OK3")
     writeDataTable(arbeidsbok, 1, gruppe)
     
-    tal_svar <- nrow(gruppe)
+    # Sjekkar kor mange svar det er i fritekstvariablane, for å kontrollere mot heile datasettet
+    # Føreset at dei første to kolonnane er grupperingskolonnar
+    # (programkode, programnamn)
+    tal_svar <- rowSums(!is.na(gruppe[-(1:2)])) %>% sum
     sum_svar_delt <- sum_svar_delt + tal_svar
+    
     ## stil
     datalengde <- tal_svar + 1
     databreidde <- ncol(gruppe)
     # TODO Finn ein måte å bestemme dette frå Shiny-appen
-    setColWidths(arbeidsbok, 1, cols = 1:11, widths = c(30, 12, 60, 60, 60, 60, 60, 60, 60, 60, 60))
+    setColWidths(arbeidsbok, 1, cols = 1:11, widths = c(12, 30, 60, 60, 60, 60, 60, 60, 60, 60, 60))
     # addStyle(arbeidsbok, 1, cols = 5, rows = 2:datalengde, svarkol_stil, gridExpand = T, stack = T)
     addStyle(arbeidsbok, 1, cols = 1:databreidde, rows = 1:datalengde, tabell_stil, gridExpand = T, stack = T)
     # print("OK4")
@@ -588,12 +597,12 @@ OM_indikator_print_2023 <- function(sdf, malfil = "", survey = "test", aggregert
   
   # Førebu datasett
   # TODO flytt group_by til metodekall for fordeling og snitt?
-  if (nrow(arstal) > 1) {
+  if (!aggregert & nrow(arstal) > 1) {
     sdf_studium_ar <- sdf %>% group_by(Studieprogram_instnamn_ar)
     sdf_studieprogramnavn <- sdf %>% group_by(Studieprogram_instnamn)
   }
   # TODO - om det ikkje er tidsserie - finn eit betre variabelnamn
-  if (nrow(arstal) == 1) {
+  if (!aggregert & nrow(arstal) == 1) {
     sdf_studieprogramnavn <- sdf %>% group_by(Studieprogram_instnamn)
   }
   # Skriv ut ei fil per fakultet - kan sikkert endrast til å bestemme grupperinga etter argument
