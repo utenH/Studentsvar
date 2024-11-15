@@ -8,16 +8,20 @@ options("openxlsx.numFmt" = "#,#0.00")
 OM_fritekst_xlsx_2022 <- function(sdf, fritekstvariabler, grupperingsvariabel, surveynamn, data_ar) {
   tabell_stil <- createStyle(wrapText = T, valign = "top")
   svarkol_stil <- createStyle(numFmt = "TEXT")
-  
+
   # Sjekkar kor mange svar det er i fritekstvariablane, for å kontrollere mot enkeltfilene
   # Føreset at dei første tre kolonnane i datasettet er grupperingskolonnar
   # (Fakultet, programkode, programnamn)
   sdf <- sdf %>% group_by(!!grupperingsvariabel) %>% select(!!!fritekstvariabler)
-  sum_svar_datasett <- rowSums(!is.na(sdf[-(1:3)])) %>% sum
-  sum_svar_delt <- 0
+  print(sdf %>% names)
   
   # Fjerne linjeskift, dei lagar krøll i utskrift til xlsx
   sdf <- sdf %>% mutate(across(where(is.character), ~gsub("\r\n", " ", .)))
+  sdf <- sdf %>% mutate(across(where(is.character), ~gsub("\n", " ", .)))
+  sdf <- sdf %>% mutate(across(where(is.character), str_trim))
+  
+  sum_svar_datasett <- rowSums(!is.na(sdf[-(1:3)])) %>% sum
+  sum_svar_delt <- 0
   
   sdf <- sdf %>% group_split
   print(sdf %>% length)
@@ -35,8 +39,8 @@ OM_fritekst_xlsx_2022 <- function(sdf, fritekstvariabler, grupperingsvariabel, s
     gruppe <- gruppe %>% ungroup %>% select(-{{grupperingsvariabel}})
     # print(gruppe %>% names %>% as.data.frame())
     # gruppe <- gruppe %>% filter(if_all(4:7, ~!is.na(.)))
-    # TODO denne ser ut til å lage krøll
-    gruppe <- gruppe %>% filter(rowSums(!is.na(.)) < length(fritekstvariabler))
+    # TODO denne ser ut til å lage krøll, nytt forsøk i juli 2024
+    gruppe <- gruppe %>% filter(rowSums(!is.na(.)) > 2)
     not_all_na <- function(x) any(!is.na(x))
     gruppe <- gruppe %>% select_if(not_all_na)
     gruppe <- gruppe %>% mutate(across(where(is.character), str_trim))
@@ -53,6 +57,7 @@ OM_fritekst_xlsx_2022 <- function(sdf, fritekstvariabler, grupperingsvariabel, s
     # Sjekkar kor mange svar det er i fritekstvariablane, for å kontrollere mot heile datasettet
     # Føreset at dei første to kolonnane er grupperingskolonnar
     # (programkode, programnamn)
+    # print(gruppe %>% names)
     tal_svar <- rowSums(!is.na(gruppe[-(1:2)])) %>% sum
     sum_svar_delt <- sum_svar_delt + tal_svar
     
@@ -128,10 +133,18 @@ SB_til_hypergene <- function(datasett, utklipp = T, utklippsstorleik = "") {
   SB
 }
 
-##** Skriv ut statistikk per variabel - basert på Kandidatundersøkinga
-##*
+##** 
+##* Skriv ut statistikk per variabel - basert på Kandidatundersøkinga
+##* Datasett må innehalde desse variablane:
+##* - Fakultetsnavn
+##* - Studieprogram_instnamn
+##* - gruppe_ar
+##* - Fakultet_ar
+##* - Institusjon
+##* - Institutt
+##* - Studieprogram_instnamn_ar
 OM_indikator_print_2023 <- function(sdf, malfil = "", survey = "test", aggregert = F) {
-  
+  # TODO: test at datasettet har variablane som trengst, eller print kva som manglar og stopp
   # loop gjennom fakultet, ein eigen for aggregert
   
   # Bestem minste tal på svar som blir tatt med
@@ -1466,11 +1479,11 @@ OM_tredeltskala_tidsserie <- function(variabel, nyvariabel) {
 # filtrere bort frå begge undersøkingar programkoder som ikkje finst i den lista
 # for kvar oppføring i samanslått liste 
 # - sjekk om den finst i SB: skriv ut
-# -sjekk om den finst i SA: skriv ut
+# - sjekk om den finst i SA: skriv ut
 # Eksportere datapakke per fakultet til programrapport - fane for kvar utdanning
 # SA_tidsserie <- list(SA23, SA22, SA21, ...)
 # SB_tidsserie <- list(SB22, SB21, SB20, ...)
-datapakke_print_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part = "") {
+datapakke_print_2024 <- function(SB_tidsserie, SA_tidsserie, part = "") {
   # Plan: 
   # Splitt på fakultet
   # Lag filnamn per fakultet
@@ -1480,11 +1493,11 @@ datapakke_print_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part =
   
   # ved å sette vektoren indikatorliste_SB og funksjonen slim_variables_SB til år-spesifikke versjonar,
   # kan resten av koden vere lik frå år til år, tilsvarande for Sisteårs
-  indikatorliste_SB <- datapakke_indikatorliste_SB23
-  slim_variables_SB <- datapakke_slim_variables_SB23
+  indikatorliste_SB <- datapakke_indikatorliste_SB24
+  slim_variables_SB <- datapakke_slim_variables_SB24
   
-  indikatorliste_SA <- datapakke_indikatorliste_SA23
-  slim_variables_SA <- datapakke_slim_variables_SA23
+  indikatorliste_SA <- datapakke_indikatorliste_SA24
+  slim_variables_SA <- datapakke_slim_variables_SA24
   
   # Reduser variablar
   SB_tidsserie <- SB_tidsserie %>% lapply(slim_variables_SB)
@@ -1538,7 +1551,7 @@ datapakke_print_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part =
   
   for (fak_n in datapakke_fakultetliste$fakultet) {
     path <- "Rapportfiler/Kvalitetsrapport datapakkar/"
-    nameroot <- "datapakke 2023"
+    nameroot <- "datapakke 2024"
     # if (part == "") part <- " testrapport"
     suf <- ".xlsx"
     # print(fak_n)
@@ -1662,7 +1675,7 @@ datapakke_print_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part =
   } # END print loop
   # *****************
   
-} # END datapakke_print_2023
+} # END datapakke_print_2024
 
 ##**
 ##* Utskriftshjelparar
@@ -1730,6 +1743,62 @@ datapakke_utrad_p <- function(sdf, sisteår, forrigeår) {
   colnames(df_p) <- "p"
   return(df_p)
 }
+
+# Select variables helper
+datapakke_slim_variables_SB24 <- function(sdf) {
+  sdf %>% select(any_of(
+    c("fakultet",
+      "Institutt",
+      "Studieprogramkode", 
+      "Studieprogram_instnamn",
+      "Nivå",
+      "undersøkelse_år",
+      "indx_laerutb10",
+      "egeteng_motivert_14",
+      "egeteng_orgakt_14",
+      "egeteng_forberedt_14",
+      "egeteng_innsats_14",
+      "indx_eget4",
+      "tid_orgstudier",
+      "tid_egenstudier",
+      "tid_arbeid"
+    )
+  )
+  )
+}
+
+# Må matche variabellista over
+datapakke_indikatorliste_SB24 <- c(
+  "Eget læringsutbytte INDEKS (Studiebarometeret)",
+  "Jeg er motivert for studieinnsats",
+  "Jeg benytter meg av de organiserte læringsaktivitetene som tilbys",
+  "Jeg møter godt forberedt til undervisningen",
+  "Jeg opplever at studieinnsatsen min er høy",
+  "INDEKS EGET ENGASJEMENT",
+  "Antall timer per uke brukt på organiserte læringsaktiviteter",
+  "Antall timer per uke brukt på egenstudier",
+  "Betalt arbeid"
+)
+
+# Select variables helper
+datapakke_slim_variables_SA24 <- function(sdf) {
+  sdf %>% select(any_of(
+    c("fakultet", 
+      "Institutt",
+      "Studieprogramkode", 
+      "Studieprogram_instnamn",
+      "Nivå",
+      "undersøkelse_år",
+      "jeg_er_godt_fornoyd_med_laeringsutbyttet_jeg_har_hatt_pa_studieprogrammet"
+    )
+  )
+  )
+}
+
+# Må matche variabellista over
+datapakke_indikatorliste_SA24 <- c(
+  "Jeg er godt fornøyd med læringsutbyttet jeg har hatt på studieprogrammet"
+)
 
 # Select variables helper
 datapakke_slim_variables_SB23 <- function(sdf) {
@@ -1816,14 +1885,14 @@ datapakke_indikatorliste_SA23 <- c(
 # SA_tidsserie <- list(SA23, SA22, SA21, ...)
 # SB_tidsserie <- list(SB22, SB21, SB20, ...)
 # nivå - "Bachelor", "Master", "Annet"
-datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part = "", nivå = "") {
+datapakke_print_aggregert_2024 <- function(SB_tidsserie, SA_tidsserie, SB_fil = "", part = "", nivå = "") {
   # ved å sette vektoren indikatorliste_SB og funksjonen slim_variables_SB til år-spesifikke versjonar,
   # kan resten av koden vere lik frå år til år, tilsvarande for Sisteårs
-  indikatorliste_SB <- datapakke_indikatorliste_SB23
-  slim_variables_SB <- datapakke_slim_variables_SB23
+  indikatorliste_SB <- datapakke_indikatorliste_SB24
+  slim_variables_SB <- datapakke_slim_variables_SB24
   
-  indikatorliste_SA <- datapakke_indikatorliste_SA23
-  slim_variables_SA <- datapakke_slim_variables_SA23
+  indikatorliste_SA <- datapakke_indikatorliste_SA24
+  slim_variables_SA <- datapakke_slim_variables_SA24
   
   # Reduser variablar
   SB_tidsserie <- SB_tidsserie %>% lapply(slim_variables_SB)
@@ -1857,15 +1926,10 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
   titlepart <- nivå
   # filtrere på nivå
   if (nivå != "") {
-    part <- paste0(" ", nivå, part)
+    part <- paste0(" ", nivå, " ", part)
     SA_tidsserie <- SA_tidsserie %>% filter(Nivå == nivå)
     SB_tidsserie <- SB_tidsserie %>% filter(Nivå == nivå)
   }
-  
-  # ved å sette vektoren indikatorliste_SB og funksjonen datapakke_slim_variables_SB til år-spesifikke versjonar,
-  # kan resten av koden vere lik frå år til år
-  indikatorliste_SB <- datapakke_indikatorliste_SB23
-  slim_variables_SB <- datapakke_slim_variables_SB23
   
   # Berre ei fil, med fane for OsloMet + fakulteta
   sn <- 1
@@ -1873,7 +1937,7 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
   
   # Filnamn
   path <- "Rapportfiler/Kvalitetsrapport datapakkar/"
-  nameroot <- "OsloMet datapakke 2023 aggregert"
+  nameroot <- "OsloMet datapakke 2024 aggregert"
   # if (part == "") part <- " testrapport"
   suf <- ".xlsx"
   # print(fak_n)
@@ -1972,6 +2036,7 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
   ##* 
   
   for (fak_n in datapakke_fakultetliste$fakultet) {
+    print(fak_n)
     addWorksheet(wb, fak_n)
     arktittel <- fak_n
     
@@ -2047,6 +2112,7 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
   ##* 
   
   for (institutt_n in datapakke_instituttliste$Institutt) {
+    print(institutt_n)
     # Studiebarometerdata
     sb_institutt <- SB_tidsserie %>% filter(Institutt == institutt_n)
     
@@ -2129,7 +2195,7 @@ datapakke_print_aggregert_2023 <- function(SB_tidsserie, SA_tidsserie, SB_fil = 
   # Lagre fil
   saveWorkbook(wb, SB_fil, overwrite = TRUE)
   
-} # END datapakke_print_aggregert_2023
+} # END datapakke_print_aggregert_2024
 
 
 # Fritekst ------------------------------------------------------------------------------------

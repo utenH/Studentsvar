@@ -36,6 +36,41 @@ OM_prepare_2022 <- function(innfil, dataår, instnr, programkode) {
 ##** 
 ##* Studiestart
 ##* 
+OM_prepare_studiestart_2024 <- function(innfil = "../datafiler/studiestart/Studiestart 2024.xlsx", dataår = 2024) {
+  OM <- read_excel(innfil)
+  OM <- OM %>% clean_names
+  OM %>% names %>% print
+  OM <- OM %>% mutate(undersokelse_år = dataår)
+  OM <- OM %>% mutate(gruppe_ar = undersokelse_år)
+  OM <- OM %>% rename(Fakultetsnavn = fakultet)
+  OM <- OM %>% rename(Programkode = programkode)
+  OM <- OM %>% rename(Studietilbud = programnavn)
+  OM <- OM_add_bakgrunnsdata(OM, "Programkode")
+  # OM <- OM %>% rename(Institutt = institutt)
+  OM <- OM %>% mutate(Studieprogram_instnamn = paste(Institutt, Studieprogramkode, Studietilbud))
+  OM <- OM %>% mutate(Institusjon = "OsloMet")
+  
+  # Omkoding
+  svar_nivå <- c("1 – i liten grad", "2", "3", "4", "5 – i stor grad")
+  OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_jeg_opplever_a_vaere_en_del_av_et_studentmiljo_pa_studiet_mitt, svar_nivå)
+  OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_studiet_mitt_har_lagt_til_rette_for_ulike_gruppeaktiviteter, svar_nivå)
+  OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_de_faglige_og_sosiale_aktivitetene_pa_studiet_har_bidratt_til_at_jeg_har_blitt_kjent_med_medstudenter, svar_nivå)
+  OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_jeg_har_noen_a_diskutere_og_samarbeide_med_utenom_det_faglige_opplegget_pa_studiet_mitt, svar_nivå)
+  OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_jeg_har_noen_pa_studiet_mitt_jeg_kan_snakke_med_om_utfordringer_jeg_opplever_som_student, svar_nivå)
+  OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_jeg_opplever_at_jeg_henger_med_faglig_i_studiet_mitt, svar_nivå)
+  OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_det_faglige_innholdet_pa_studiet_svarer_sa_langt_til_mine_forventinger, svar_nivå)
+  
+  OM <- OM %>% OM_janei_bin_nyvar(svar = ser_du_for_deg_at_du_kommer_til_a_fullfore_dette_studiet,
+                                  nyvar = ser_du_for_deg_at_du_kommer_til_a_fullfore_dette_studiet_bin)
+  
+  OM <- OM %>% mutate(ser_du_for_deg_at_du_kommer_til_a_fullfore_dette_studiet = 
+                        factor(ser_du_for_deg_at_du_kommer_til_a_fullfore_dette_studiet,
+                               levels = c("Ja", "Vet ikke", "Nei"),
+                               labels = c("Ja", "Vet ikke", "Nei"),
+                               ordered = T))
+  
+  return(OM) 
+}
 
 OM_prepare_studiestart_2023 <- function(innfil = "../datafiler/studiestart/Studiestart 2023.xlsx", dataår = 2023) {
   OM <- read_excel(innfil)
@@ -160,11 +195,58 @@ EXC_tabell_meirinfo <- function(sdf) {
 SB_prepare_2024 <- function(innfil, dataår, instnr, kopleprogramdata = T, brukParaplykoder = FALSE) {
   OM <- read_excel(innfil)
   OM <- OM %>% mutate(undersøkelse_år = dataår)
+  OM <- OM %>% rename("Studieprogramkode" = "studprog_kod")
+  OM <- OM %>% rename("progresjon" = "an_heltid_DBH")
+  # I 2022 inneheldt datasettet nokre observasjonar utan studprog_kod/studiepgm_navn
+  # Filtrerer bort slike
+  OM <- OM %>% filter(!is.na("Studieprogramkode"))
+  OM <- OM %>% filter(STUDIEAR != 3 | is.na(STUDIEAR))
+  OM <- OM %>% filter(Studieprogramkode != "M1GSP")
+  
+  OM[OM==9999] <- NaN # Var NA, bytta 2020 for å skilje mellom ikkje-svar (NA) og Vet ikke (NaN)
+  OM <- SB_name_fak_kort(OM)
+  
+  OM <- OM %>% select(-pc_praksDBH)
+  OM <- OM_add_programdata(OM, "Studieprogramkode")
+  OM <- OM_add_bakgrunnsdata(OM, "Studieprogramkode")
+  
+  OM <- SB_add_nivå(OM)
+  OM <- OM %>% mutate(STUDIEAR = case_when(
+    grepl("IFHBA|TANNTEKB|TLKBA|UVB-SPPT|YFLH-teknisk", Studieprogramkode) ~ 2,
+    T ~ STUDIEAR))
+  
+  # if (kopleprogramdata) {
+  #   if (instnr == 1175) {
+  #     # legg til programnamn med instituttilhøyrigheit
+  #     OM <- dbh_add_programdata(OM, "studprog_kod", instnr)
+  #     if (brukParaplykoder) {
+  #       OM <- OM_kople_paraplyprogram(OM, "Studieprogramkode", erstatt_kode = T)
+  #     }
+  #     OM <- OM %>% kople_studieprogramkode(Studieprogramkode, vis_samla_kode = F)
+  #   } else {
+  #     OM <- dbh_add_programdata(OM, "studprog_kod", instnr)
+  #   }
+  # }
+  OM <- OM_janei_bin_sane(OM, forstevalg_studprog_23)
+  OM <- SB_plan_fullføring(OM)
+  OM <- OM_null_til_en_indeksering(OM, bruker_ki_23)
+  OM <- SB_add_sum_tid(OM)
+  OM <- SB_prep_indeks(OM)
+  return(OM)
+} 
+
+###* 
+##* Studiebarometeret
+SB_prepare_2024_med_DBH <- function(innfil, dataår, instnr, kopleprogramdata = T, brukParaplykoder = FALSE) {
+  OM <- read_excel(innfil)
+  OM <- OM %>% mutate(undersøkelse_år = dataår)
   # I 2022 inneheldt datasettet nokre observasjonar utan studprog_kod/studiepgm_navn
   # Filtrerer bort slike
   OM <- OM %>% filter(!is.na(studprog_kod))
   OM[OM==9999] <- NaN # Var NA, bytta 2020 for å skilje mellom ikkje-svar (NA) og Vet ikke (NaN)
   OM <- SB_name_fak_kort(OM)
+  
+  OM <- OM %>% select(-pc_praksDBH)
   
   if (kopleprogramdata) {
     if (instnr == 1175) {
@@ -180,6 +262,7 @@ SB_prepare_2024 <- function(innfil, dataår, instnr, kopleprogramdata = T, brukP
       OM <- dbh_add_programdata(OM, "studprog_kod", instnr)
     }
   }
+
   OM <- OM_janei_bin_sane(OM, forstevalg_studprog_23)
   OM <- SB_plan_fullføring(OM)
   OM <- OM_null_til_en_indeksering(OM, bruker_ki_23)
@@ -230,6 +313,7 @@ SB_prepare_2022 <- function(innfil, dataår, instnr) {
 ##* For å handtere paraplyprogram og andre program samla
 OM_kople_paraplyprogram <- function(sdf, innvariabel, erstatt_kode = TRUE) {
   paraplykoder <- OM_hent_paraplykoder() %>% select(Paraplyvennleg_kode, Studieprogramkode)
+  # TODO denne kan vere feil (i staden for setNames: ', by = c("Studieprogramkode" = innvariabel))
   sdf <- left_join(sdf, paraplykoder,
                    by = setNames("Studieprogramkode", innvariabel)) 
                    # by = "Studieprogramkode") 
@@ -259,17 +343,34 @@ SB_unntak <- function(sdf) {
 
 ##**
 ##* Funksjon for førebuing av dataframes, Sisteårs 
-##* Skulle gjerne hatt felles, men viktigare med felles utskriftsfunksjon
-##* 
-SA_prepare_2023 <- function(innfil, dataår, instnr) {
+SA_prepare_2024 <- function(innfil, dataår, instnr) {
   OM <- read_excel(innfil, .name_repair = janitor::make_clean_names)
   colnames(OM) <- gsub(pattern = "-", replacement = "", x = colnames(OM))
   OM <- OM %>% mutate(undersøkelse_år = dataår)
   OM[OM==9999] <- NaN # skiljer mellom ikkje-svar (NA) og Vet ikke (NaN)
-  OM <- dbh_add_programdata(OM, "fs_kode", instnr)
+  
+  OM <- OM %>% rename("Studieprogramkode" = "progkode")
+  OM <- OM_add_bakgrunnsdata(OM, "Studieprogramkode")
   OM <- OM_add_programdata(OM, "Studieprogramkode")
   OM <- SA_tilpassdata(OM)
-  OM <- SA_prep_indeks(OM)
+  
+  OM <- SA_add_nivå(OM)
+  
+  OM <- OM %>% mutate(instnr = instnr) 
+  return(OM)
+} 
+
+##**
+##* Funksjon for førebuing av dataframes, Sisteårs 
+##* Skulle gjerne hatt felles, men viktigare med felles utskriftsfunksjon
+SA_prepare_2024_med_DBH <- function(innfil, dataår, instnr) {
+  OM <- read_excel(innfil, .name_repair = janitor::make_clean_names)
+  colnames(OM) <- gsub(pattern = "-", replacement = "", x = colnames(OM))
+  OM <- OM %>% mutate(undersøkelse_år = dataår)
+  OM[OM==9999] <- NaN # skiljer mellom ikkje-svar (NA) og Vet ikke (NaN)
+  OM <- dbh_add_programdata(OM, "progkode", instnr)
+  OM <- OM_add_programdata(OM, "Studieprogramkode")
+  OM <- SA_tilpassdata(OM)
   # TODO dette er lat hack, finn betre måte, f.eks. ta med instnr frå DBH
   OM <- OM %>% mutate(instnr = instnr) 
   return(OM)
@@ -295,7 +396,70 @@ SA_prepare_fritekst <- function(datafil) {
 }
 
 # Hjelpefunksjon for omkoding - sjekk kode for kandidatundersøking
+# TODO - frå 2023 er spørsmålsteksten endra, slik at "Hvor enig er du i disse påstandene" ikkje er med
+# TODO - oppdatere kva variablar som er med
 SA_tilpassdata <- function(sdf) {
+  #Svaralternativer: "1 = Ikke enig" - 5 = "Helt enig"	
+  sdf <- SA_text_to_numerallevels(sdf, jeg_kjenner_godt_til_laeringsutbyttebeskrivelsene_for_studieprogrammet_mitt)
+  sdf <- SA_text_to_numerallevels(sdf, jeg_er_godt_fornoyd_med_laeringsutbyttet_jeg_har_hatt_pa_studieprogrammet)
+  sdf <- SA_text_to_numerallevels(sdf, alt_i_alt_tror_jeg_ikke_at_kronapandemien_har_svekket_laeringsutbyttet_mitt)
+  
+  #Svaralternativer: 1="Ikke fornøyd" - 5="Svært fornøyd"	
+  sdf <- SA_text_to_numerallevels(sdf, de_faglig_ansattes_evne_til_a_formidle_laerestoffet_pensum_pa_en_forstaelig_mate)
+  sdf <- SA_text_to_numerallevels(sdf, faglig_veiledning_og_diskusjoner_med_faglig_ansatte)
+  sdf <- SA_text_to_numerallevels(sdf, miljoet_mellom_undervisere_og_studenter)
+  sdf <- SA_text_to_numerallevels(sdf, det_faglige_miljo_blant_studentene)
+  sdf <- SA_text_to_numerallevels(sdf, det_sosiale_miljoet_blant_studentene)
+  
+  #Svaralternativer: "1 = Ikke enig" - 5 = "Helt enig"	
+  sdf <- SA_text_to_numerallevels(sdf, jeg_er_fornoyd_med_maten_emneevalueringer_gjennomfores_pa_i_mitt_studieprogram)
+  sdf <- SA_text_to_numerallevels(sdf, jeg_tror_laererne_pa_mitt_studieprogram_bruker_emneevalueringene_til_a_forbedre_utdanningen)
+  
+  #"Ja, alle emnene har vært nyttige" versus  "Nei, minst ett emne har vært mindre nyttig"	
+  sdf <- OM_janei_bin(sdf, har_alle_emnene_i_studieprogrammet_ditt_vaert_nyttige)
+  
+  #Svaralternativer: "1 = Ikke enig" - 5 = "Helt enig"
+  sdf <- SA_text_to_numerallevels(sdf, det_er_god_luft_og_temperatur_i_undervisningsrommene)
+  sdf <- SA_text_to_numerallevels(sdf, jeg_og_mine_medstudenter_finner_et_egnet_sted_a_vaere_nar_vi_skal_jobbe_sammen_i_gruppe)
+  sdf <- SA_text_to_numerallevels(sdf, jeg_finner_lesesalsplass_nar_jeg_trenger_det)
+  sdf <- SA_text_to_numerallevels(sdf, bruken_av_digitalt_utstyr_fungerer_godt_i_undervisningen)
+  
+  #Svaralternativer: "1 = Ikke enig" - 5 = "Helt enig"	
+  sdf <- SA_text_to_numerallevels(sdf, det_er_lett_a_finne_informasjonen_jeg_trenger_i_canvas)
+  sdf <- SA_text_to_numerallevels(sdf, det_er_lett_a_finne_informasjonen_jeg_trenger_pa_student_oslomet_no)
+  sdf <- SA_text_to_numerallevels(sdf, det_er_godt_samsvar_mellom_informasjon_fra_undervisere_og_administrasjon)
+  
+  #Svaralternativer: "1 = Ikke enig" - 5 = "Helt enig"	
+  sdf <- SA_text_to_numerallevels(sdf, jeg_var_godt_forberedt_til_praksisperioden_e)
+  sdf <- SA_text_to_numerallevels(sdf, det_var_godt_samarbeid_mellom_praksisstedet_og_oslo_met)
+  sdf <- SA_text_to_numerallevels(sdf, teoriopplaeringen_var_relevant_for_praksisutovelsen)
+  sdf <- SA_text_to_numerallevels(sdf, praksisutovelsen_ble_brukt_som_grunnlag_for_diskusjon_refleksjon_i_undervisningen)
+  
+  #Tellende svaralternativer: "Ja", "Nei". "Usikker" er ikke tatt med	
+  sdf <- OM_janei_bin(sdf, har_du_i_lopet_av_tiden_pa_dette_studieprogrammet_hatt_gjesteforeleser_laerer_fra_en_utenlandsk_undervisningsinstitusjon_i_noen_av_dine_emner)
+  sdf <- OM_janei_bin(sdf, har_du_i_lopet_av_tiden_pa_dette_studieprogrammet_fatt_undervisning_pa_engelsk_i_noen_av_dine_emner_ved_oslo_met)
+  sdf <- OM_janei_bin(sdf, har_du_i_lopet_av_tiden_pa_dette_studieprogrammet_vaert_pa_utvekslings_studie_praksis_eller_prosjektopphold_i_utlandet)
+  
+  #"Svaralternativer:  1=""Ikke fornøyd"" - 5=""Svært fornøyd""
+  #NB! De som opplyste at studieoppholdet ble sterkt berørt av koronasituasjonen har ikke fått dette spørsmålet."
+  sdf <- SA_text_to_numerallevels(sdf, hvor_fornoyd_er_du_med_utbyttet_av_utenlandsoppholdet)
+  
+  #Tellende svaralternativer: "Ja", "Nei". "Usikker" er ikke tatt med	
+  sdf <- OM_janei_bin(sdf, har_du_i_lopet_av_tiden_pa_dette_studieprogrammet_fatt_undervisning_som_har_gitt_deg_internasjonal_og_flerkulturell_kompetanse)
+  sdf <- OM_janei_bin(sdf, har_du_i_lopet_av_tiden_pa_dette_studieprogrammet_deltatt_i_nettbaserte_grupper_med_studenter_fra_andre_land)
+  
+  #Skala: 1="I liten grad" - 5="I stor grad"	
+  sdf <- SA_text_to_numerallevels(sdf, i_hvilken_grad_mener_du_at_eksamener_innleveringer_og_andre_vurderingsformer_i_studieprogrammet_ditt_har_handlet_om_sentrale_deler_av_laerestoffet_pensum)
+  sdf <- SA_text_to_numerallevels(sdf, i_hvilken_grad_mener_du_at_eksamener_innleveringer_og_andre_vurderingsformer_i_studieprogrammet_ditt_har_krevd_forstaelse_og_resonnement)
+  sdf <- SA_text_to_numerallevels(sdf, i_hvilken_grad_mener_du_at_eksamener_innleveringer_og_andre_vurderingsformer_i_studieprogrammet_ditt_har_hatt_tydelige_kriterier_for_vurdering)
+  sdf <- SA_text_to_numerallevels(sdf, i_hvilken_grad_mener_du_at_eksamener_innleveringer_og_andre_vurderingsformer_i_studieprogrammet_ditt_har_bidratt_til_din_faglige_utvikling)
+  #Skala: 1="Ikke fornøyd" - 5="Svært fornøyd"	
+  sdf <- SA_text_to_numerallevels(sdf, alt_i_alt_hvor_fornoyd_er_du_med_studieprogrammet_du_gar_pa)
+  
+  return(sdf)
+}
+
+SA_tilpassdata_2022 <- function(sdf) {
   #Svaralternativer: "1 = Ikke enig" - 5 = "Helt enig"	
   sdf <- SA_text_to_numerallevels(sdf, hvor_enig_er_du_i_disse_pastandene_jeg_kjenner_godt_til_laeringsutbyttebeskrivelsene_for_studieprogrammet_mitt)
   sdf <- SA_text_to_numerallevels(sdf, hvor_enig_er_du_i_disse_pastandene_jeg_er_godt_fornoyd_med_laeringsutbyttet_jeg_har_hatt_pa_studieprogrammet)
@@ -354,7 +518,6 @@ SA_tilpassdata <- function(sdf) {
   
   return(sdf)
 }
-
 ##**
 ##* DBH-funksjonar 
 library(rdbhapi)
@@ -512,7 +675,7 @@ dbh_hent_orgdata <- function(instnr = 1175) {
   }
   
   # Hentar tabell med fakultetskode og -namn
-  dbh_210 <- dbh_data(210) %>% filter(Institusjonskode == instnr) %>%
+  dbh_210 <- dbh_data(210, group_by = "*") %>% filter(Institusjonskode == instnr) %>%
     select(Fakultetskode, Fakultetsnavn) %>% unique() %>% arrange(Fakultetskode)
   
   # Forkorte fakultetsnamn - flytta til dbh_hent_programdata()
@@ -713,6 +876,45 @@ OM_add_programdata <- function(sdf, varnamn) {
   return(sdf)
 }
 
+OM_add_bakgrunnsdata <- function(sdf, varnamn) {
+  OM_programvar <- read_excel("base/OsloMet_studieprogramvariabler_tableau.xlsx")
+  OM_programvar <- OM_programvar %>% fill(Studieprogram, Fakultet, Institutt) %>% 
+    # filter(!grepl("topp|SPS", Institutt)) %>% 
+    mutate(Institutt = word(Institutt, 2)) %>% 
+    select(varnamn = Studieprogram, 
+           Institutt, heltid_tableau = `Andel heltid`) %>% unique()
+  
+  if(OM_programvar %>% filter(Studieprogramkode %>% duplicated) %>% count > 0) {
+    print("OBS: Duplikat i Studieprogramkode henta frå Tableau")
+    print(OM_programvar %>% filter(Studieprogramkode %>% duplicated) %>% select(Studieprogramkode) %>% unique())
+  }
+  sdf <- left_join(sdf, OM_programvar,
+                   by = varnamn)
+                     #setNames(varnamn = "Studieprogramkode"))
+  
+  sdf <- sdf %>% mutate(Institutt = case_when(
+    grepl("YFL", Studieprogramkode) ~ "YLU",
+    grepl("MAFYS", Studieprogramkode) ~ "RHT",
+    grepl("MAPO", Studieprogramkode) ~ "SHA",
+    T ~ Institutt
+  ))
+  
+  if(sdf %>% filter(is.na(Institutt)) %>% count > 0) {
+    print("OBS: Nokre studieprogram manglar instituttvariabel")
+    print(sdf %>% filter(is.na(Institutt)) %>% select(Studieprogramkode) %>% unique())    
+  }
+  # sdf <- sdf %>% rename("Studieprogramkode" = !!varnamn)
+  # 
+  # # Om det er Studiebarometerdata, kan vi skilje mellom 2. og 5. år på grunnskulelærarutdanninga
+  # if ("STUDIEAR" %in% (sdf %>% names)) {
+  #   sdf <- sdf %>% mutate(Studieprogram_instnamn = case_when(
+  #     grepl("GLU", Studieprogramkode) ~ paste0(Studieprogram_instnamn, " (", STUDIEAR, ". studieår)"),
+  #     T ~ Studieprogram_instnamn
+  #   ))
+  # }
+  return(sdf)
+}
+
 ##**
 #* Kodar Nivå-variabel til bruk i filtrering
 SB_add_nivå <- function(sdf) {
@@ -729,6 +931,26 @@ SB_add_nivå <- function(sdf) {
   return(sdf)
 }
 
+##**
+#* Kodar Nivå-variabel til bruk i filtrering
+SA_add_nivå <- function(sdf) {
+  if ("master" %in% (sdf %>% names)) {
+    sdf <- sdf %>% mutate(Nivå = case_when(
+      master == "MA" ~ "Master",
+      master == "BA" ~ "Bachelor", 
+      TRUE ~ "Annet"
+    ))
+  }
+  if ("grad" %in% (sdf %>% names)) {
+    sdf <- sdf %>% mutate(Nivå = case_when(
+      grepl("Master", grad) ~ "Master",
+      grepl("Bachelor", grad)  ~ "Bachelor", 
+      TRUE ~ "Annet"
+    ))
+  }
+  return(sdf)
+}
+
 ## Taldata  ##
 
 # Legg til alle indeksar, set alle indx med for mange missing til NA
@@ -741,6 +963,12 @@ SA_prep_indeks <- function(sdf) {
 }
 
 SAvar_praksis <- c("hvor_enig_er_du_i_disse_pastandene_jeg_var_godt_forberedt_til_praksisperioden_e",
+                        "hvor_enig_er_du_i_disse_pastandene_det_var_godt_samarbeid_mellom_praksisstedet_og_oslo_met",
+                        "hvor_enig_er_du_i_disse_pastandene_teoriopplaeringen_var_relevant_for_praksisutovelsen",
+                        "hvor_enig_er_du_i_disse_pastandene_praksisutovelsen_ble_brukt_som_grunnlag_for_diskusjon_refleksjon_i_undervisningen")
+
+
+SAvar_praksis_2022 <- c("hvor_enig_er_du_i_disse_pastandene_jeg_var_godt_forberedt_til_praksisperioden_e",
                    "hvor_enig_er_du_i_disse_pastandene_det_var_godt_samarbeid_mellom_praksisstedet_og_oslo_met",
                    "hvor_enig_er_du_i_disse_pastandene_teoriopplaeringen_var_relevant_for_praksisutovelsen",
                    "hvor_enig_er_du_i_disse_pastandene_praksisutovelsen_ble_brukt_som_grunnlag_for_diskusjon_refleksjon_i_undervisningen")
@@ -773,6 +1001,77 @@ SB_add_sum_tid <- function(sdf) {
   sdf$tid_brutto[sdf$tid_brutto <= 11 | sdf$tid_brutto >= 61] <- NA
   
   return(sdf)
+}
+
+##**
+##* For rydding av Studiebarometerdatafiler til aggregerte datapakkar, samlefunksjon
+SB_rydde_til_aggregert_datapakke <- function(sdf_list) {
+  SB_aggr_tidsserie_rydda <- lapply(sdf_list, SB_rydd_studiear)
+  SB_aggr_tidsserie_rydda <- lapply(sdf_list, SB_rydd_tidsvar_progresjon)
+  return(SB_aggr_tidsserie_rydda)
+}
+
+SA_rydde_til_aggregert_datapakke <- function(sdf_list) {
+  SA_aggr_tidsserie_rydda <- lapply(sdf_list, SA_rydd_NAfakultet)
+  return(SA_aggr_tidsserie_rydda)
+}
+
+# Til manuell rydding av tidsvariablar for å berre beholde dei på heiltidsprogram
+SB_rydd_tidsvar_progresjon <- function(sdf) {
+  # sdf$sum_tid_studier[is.na(sdf$progresjon < 1)] <- NA
+  # sdf$tid_orgstudier[is.na(sdf$progresjon < 1)] <- NA
+  # sdf$tid_egenstudier[is.na(sdf$progresjon < 1)] <- NA
+  # sdf$tid_arbeid[is.na(sdf$progresjon < 1)] <- NA
+  
+  sdf <- sdf %>% mutate(
+  sum_tid_studier = ifelse(progresjon < 1, NA, sum_tid_studier),
+  tid_orgstudier = ifelse(progresjon < 1, NA, tid_orgstudier),
+  tid_egenstudier = ifelse(progresjon < 1, NA, tid_egenstudier),
+  tid_arbeid = ifelse(progresjon < 1, NA, tid_arbeid)
+  )
+  return (sdf)
+}
+
+##**
+##* Datapakking hjelpefunksjon
+datapakke_pakkar <- function(filnamn_del = "test") {
+  SB23_aggr <- SB_prepare_2024("../datafiler/studiebarometeret/SB2023_Rådata.xlsx", dataår = 2023, instnr = "1175")
+  SB22_aggr <- SB_prepare_2024("../datafiler/studiebarometeret/SB2022_Rådata.xlsx", dataår = 2022, instnr = "1175")
+  SB21_aggr <- SB_prepare_2024("../datafiler/studiebarometeret/SB2021_Rådata.xlsx", dataår = 2021, instnr = "1175")
+  SB_aggr_tidsserie <- list(SB23_aggr, SB22_aggr, SB21_aggr)
+  SB_aggr_tidsserie <- SB_rydde_til_aggregert_datapakke(SB_aggr_tidsserie)
+  
+  SA24 <- SA_prepare_2024("../datafiler/sisteårs/Sisteårs2024.xlsx", dataår = 2024, instnr = "1175")
+  SA23 <- SA_prepare_2024("../datafiler/sisteårs/Sisteårs2023.xlsx", dataår = 2023, instnr = "1175")
+  SA22 <- SA_prepare_2024("../datafiler/sisteårs/Sisteårs2022_nyenavn.xlsx", dataår = 2022, instnr = "1175")
+  SA_tidsserie <- list(SA24, SA23, SA22)
+  SA_tidsserie <- SA_rydde_til_aggregert_datapakke(SA_tidsserie)
+  
+  datapakke_print_aggregert_2024(SB_aggr_tidsserie, SA_tidsserie, part = filnamn_del, nivå = "Master")
+  datapakke_print_aggregert_2024(SB_aggr_tidsserie, SA_tidsserie, part = filnamn_del, nivå = "Bachelor")
+}
+
+# Til manuell rydding av tidsvariablar for å berre beholde dei som er innanfor filtreringa på 11–60
+SB_rydd_tidsvar_brutto <- function(sdf) {
+  sdf <- sdf %>% mutate(
+    sum_tid_studier = ifelse(is.na(tid_brutto), NA, sum_tid_studier),
+    tid_orgstudier = ifelse(is.na(tid_brutto), NA, tid_orgstudier),
+    tid_egenstudier = ifelse(is.na(tid_brutto), NA, tid_egenstudier),
+    tid_arbeid = ifelse(is.na(tid_brutto), NA, tid_arbeid)
+  )
+  return (sdf)
+}
+
+# Til manuell rydding av STUDIEAR, fjernar både utprøving på tredjeår, og NA
+SB_rydd_studiear <- function(sdf) {
+  sdf <- sdf %>% filter(STUDIEAR != 3)
+  return (sdf)
+}
+
+# Til manuell rydding av linjer der fakultet er NA
+SA_rydd_NAfakultet <- function(sdf) {
+  sdf <- sdf %>% filter(!is.na(fakultet))
+  return (sdf)
 }
 
 # Lagar indeks per respondent, 
