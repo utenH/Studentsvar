@@ -36,6 +36,17 @@ OM_prepare_2022 <- function(innfil, dataår, instnr, programkode) {
 ##** 
 ##* Studiestart
 ##* 
+
+OM_studiestart_filtrer_nivå <- function(sdf, nivå = "bama") {
+  if (nivå == "bama") {
+    sdf <- sdf %>% filter(!grepl("Års|pedag|forku|Høg", studieniva))
+  }
+  if (nivå == "andre") {
+    sdf <- sdf %>% filter(!grepl("Bachelor|Master", studieniva))
+  }
+  return(sdf)
+}
+
 OM_prepare_studiestart_2024 <- function(innfil = "../datafiler/studiestart/Studiestart 2024.xlsx", dataår = 2024) {
   OM <- read_excel(innfil)
   OM <- OM %>% clean_names
@@ -43,12 +54,15 @@ OM_prepare_studiestart_2024 <- function(innfil = "../datafiler/studiestart/Studi
   OM <- OM %>% mutate(undersokelse_år = dataår)
   OM <- OM %>% mutate(gruppe_ar = undersokelse_år)
   OM <- OM %>% rename(Fakultetsnavn = fakultet)
-  OM <- OM %>% rename(Programkode = programkode)
+  OM <- OM %>% mutate(Fakultet_ar = paste(Fakultetsnavn, gruppe_ar))
+  OM <- OM %>% rename(Studieprogramkode = programkode)
   OM <- OM %>% rename(Studietilbud = programnavn)
-  OM <- OM_add_bakgrunnsdata(OM, "Programkode")
+  OM <- OM_add_bakgrunnsdata(OM, "Studieprogramkode")
   # OM <- OM %>% rename(Institutt = institutt)
   OM <- OM %>% mutate(Studieprogram_instnamn = paste(Institutt, Studieprogramkode, Studietilbud))
+  OM <- OM %>% mutate(Studieprogram_instnamn_ar = paste(Studieprogram_instnamn, gruppe_ar))
   OM <- OM %>% mutate(Institusjon = "OsloMet")
+  OM <- OM %>% mutate(OM_ar = paste("OsloMet", gruppe_ar))
   
   # Omkoding
   svar_nivå <- c("1 – i liten grad", "2", "3", "4", "5 – i stor grad")
@@ -69,6 +83,15 @@ OM_prepare_studiestart_2024 <- function(innfil = "../datafiler/studiestart/Studi
                                labels = c("Ja", "Vet ikke", "Nei"),
                                ordered = T))
   
+  OM <- OM %>% OM_janei_bin_nyvar(svar = gar_du_pa_det_studiet_du_hadde_satt_opp_som_ditt_forstevalg,
+                                  nyvar = gar_du_pa_det_studiet_du_hadde_satt_opp_som_ditt_forstevalg_bin)
+  
+  OM <- OM %>% mutate(gar_du_pa_det_studiet_du_hadde_satt_opp_som_ditt_forstevalg = 
+                        factor(gar_du_pa_det_studiet_du_hadde_satt_opp_som_ditt_forstevalg,
+                               levels = c("Ja", "Husker ikke", "Nei"),
+                               labels = c("Ja", "Husker ikke", "Nei"),
+                               ordered = T))
+  
   return(OM) 
 }
 
@@ -79,11 +102,14 @@ OM_prepare_studiestart_2023 <- function(innfil = "../datafiler/studiestart/Studi
   OM <- OM %>% mutate(undersokelse_år = dataår)
   OM <- OM %>% mutate(gruppe_ar = undersokelse_år)
   OM <- OM %>% rename(Fakultetsnavn = fakultet)
+  OM <- OM %>% mutate(Fakultet_ar = paste(Fakultetsnavn, gruppe_ar))
   OM <- OM %>% rename(Institutt = institutt)
   OM <- OM %>% rename(Studieprogramkode = programkode)
   OM <- OM %>% rename(Studietilbud = programnavn)
   OM <- OM %>% mutate(Studieprogram_instnamn = paste(Institutt, Studieprogramkode, Studietilbud))
+  OM <- OM %>% mutate(Studieprogram_instnamn_ar = paste(Studieprogram_instnamn, gruppe_ar))
   OM <- OM %>% mutate(Institusjon = "OsloMet")
+  OM <- OM %>% mutate(OM_ar = paste("OsloMet", gruppe_ar))
   
   # Omkoding
   svar_nivå <- c("1 – i liten grad", "2", "3", "4", "5 – i stor grad")
@@ -881,37 +907,28 @@ OM_add_bakgrunnsdata <- function(sdf, varnamn) {
   OM_programvar <- OM_programvar %>% fill(Studieprogram, Fakultet, Institutt) %>% 
     # filter(!grepl("topp|SPS", Institutt)) %>% 
     mutate(Institutt = word(Institutt, 2)) %>% 
-    select(varnamn = Studieprogram, 
+    select(!!varnamn := Studieprogram, 
            Institutt, heltid_tableau = `Andel heltid`) %>% unique()
-  
-  if(OM_programvar %>% filter(Studieprogramkode %>% duplicated) %>% count > 0) {
+  print(OM_programvar %>% names)
+  if(OM_programvar %>% filter(!!varnamn %>% duplicated) %>% count > 0) {
     print("OBS: Duplikat i Studieprogramkode henta frå Tableau")
-    print(OM_programvar %>% filter(Studieprogramkode %>% duplicated) %>% select(Studieprogramkode) %>% unique())
+    print(OM_programvar %>% filter(!!varnamn %>% duplicated) %>% select(!!varnamn) %>% unique())
   }
   sdf <- left_join(sdf, OM_programvar,
-                   by = varnamn)
-                     #setNames(varnamn = "Studieprogramkode"))
+                   by = {{varnamn}})
   
   sdf <- sdf %>% mutate(Institutt = case_when(
-    grepl("YFL", Studieprogramkode) ~ "YLU",
-    grepl("MAFYS", Studieprogramkode) ~ "RHT",
-    grepl("MAPO", Studieprogramkode) ~ "SHA",
+    grepl("YFL", !!varnamn) ~ "YLU",
+    grepl("MAFYS", !!varnamn) ~ "RHT",
+    grepl("MAPO", !!varnamn) ~ "SHA",
     T ~ Institutt
   ))
   
   if(sdf %>% filter(is.na(Institutt)) %>% count > 0) {
     print("OBS: Nokre studieprogram manglar instituttvariabel")
-    print(sdf %>% filter(is.na(Institutt)) %>% select(Studieprogramkode) %>% unique())    
+    print(sdf %>% filter(is.na(Institutt)) %>% select(!!varnamn) %>% unique())    
   }
-  # sdf <- sdf %>% rename("Studieprogramkode" = !!varnamn)
-  # 
-  # # Om det er Studiebarometerdata, kan vi skilje mellom 2. og 5. år på grunnskulelærarutdanninga
-  # if ("STUDIEAR" %in% (sdf %>% names)) {
-  #   sdf <- sdf %>% mutate(Studieprogram_instnamn = case_when(
-  #     grepl("GLU", Studieprogramkode) ~ paste0(Studieprogram_instnamn, " (", STUDIEAR, ". studieår)"),
-  #     T ~ Studieprogram_instnamn
-  #   ))
-  # }
+
   return(sdf)
 }
 
@@ -2067,6 +2084,7 @@ OM_janei_bin_nyvar <- function(sdf, nyvar, svar) {
     grepl("Nei", {{svar}}) ~ 0,
     grepl("No", {{svar}}) ~ 0,
     grepl("Vet ikke", {{svar}}) ~ NaN,
+    grepl("Husker ikke", {{svar}}) ~ NaN,
     grepl("Do not know", {{svar}}) ~ NaN,
     grepl("Usikker", {{svar}}) ~ NaN,
     grepl("Uncertain", {{svar}}) ~ NaN

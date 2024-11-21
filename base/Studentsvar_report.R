@@ -143,7 +143,7 @@ SB_til_hypergene <- function(datasett, utklipp = T, utklippsstorleik = "") {
 ##* - Institusjon
 ##* - Institutt
 ##* - Studieprogram_instnamn_ar
-OM_indikator_print_2023 <- function(sdf, malfil = "", survey = "test", aggregert = F) {
+OM_indikator_print_2023 <- function(sdf, malfil = "", survey = "test", aggregert = F, part = "") {
   # TODO: test at datasettet har variablane som trengst, eller print kva som manglar og stopp
   # loop gjennom fakultet, ein eigen for aggregert
   
@@ -237,7 +237,7 @@ OM_indikator_print_2023 <- function(sdf, malfil = "", survey = "test", aggregert
         !!nkol_siste := sum(!is.na(.data[[variabel]][gruppe_ar == kol_siste])),
         "p_verdi" = tryCatch(t.test(as.numeric(.data[[variabel]])[gruppe_ar == kol_eldre], 
                                     as.numeric(.data[[variabel]][gruppe_ar == kol_siste]),
-                                    var.equal = F)$p.value, error = function(e) {return(NA)}, 
+                                    var.equal = T)$p.value, error = function(e) {return(NA)}, 
                              silent = TRUE)
       )
     
@@ -446,7 +446,8 @@ OM_indikator_print_2023 <- function(sdf, malfil = "", survey = "test", aggregert
       } # END LOOP
       
       # Lagre arbeidsbok    
-      rapportfil <- paste0(surveyinfo, "/", "aggregert", " ",  survey, " ", arstal_siste, ".xlsx")
+      # rapportfil <- paste0(surveyinfo, "/", "aggregert", " ",  survey, " ", arstal_siste, ".xlsx")
+      rapportfil <- paste0(surveyinfo, "/", "aggregert", " ",  paste(survey, part), arstal_siste, ".xlsx")
       print(rapportfil)
       saveWorkbook(wb = arbeidsbok,
                    file = rapportfil,
@@ -711,7 +712,7 @@ OM_indikator_print_2022 <- function(sdf, malfil = "", survey = "test", aggregert
         !!nkol_siste := sum(!is.na(.data[[variabel]][gruppe_ar == kol_siste])),
         "p_verdi" = tryCatch(t.test(as.numeric(.data[[variabel]])[gruppe_ar == kol_eldre], 
                                     as.numeric(.data[[variabel]][gruppe_ar == kol_siste]),
-                                    var.equal = F)$p.value, error = function(e) {return(NA)}, 
+                                    var.equal = T)$p.value, error = function(e) {return(NA)}, 
                              silent = TRUE)
       )
     
