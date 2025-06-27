@@ -14,6 +14,8 @@ library(shinyWidgets)
 library(htmlwidgets)
 library(stringr)
 library(janitor)
+library(rdbhapi)
+
 # library(XLConnect)
 # library(gtools) #usikker på om denne gjer noko
 

@@ -175,9 +175,9 @@ SP_studietilbod_OM <- function(mal_fil = "malfiler/Studieoversikt_mal.docx", ut_
   år_avgrensing_diagram <- 2018
   # år_avgrensing_diagram_øvre <- 2018
   år_avgrensing_tabellar <- 2021
-  måleår_tabell <- 2023
-  år_avgrensing_øvre <- 2023
-  år_no <- 2023
+  måleår_tabell <- 2024
+  år_avgrensing_øvre <- 2024
+  år_no <- 2024
   
   # Kolonnar å vise i tabelldel: Fullført måleår_tabell, Andel fullført normert tid måleår_tabell, Møtt år_no
   kol_fullført_måleår <- paste("Fullførte", måleår_tabell, sep = "_")
@@ -308,7 +308,8 @@ SP_studietilbod_OM <- function(mal_fil = "malfiler/Studieoversikt_mal.docx", ut_
   
   # Slår saman med studieprogramvariablane
   studietilbod <- left_join(studietilbod, fullfort_OM_pivot, "Studieprogramkode")
-  return(studietilbod)
+  # return(studietilbod)
+  
   ##** 
   ##* Legge til kolonnar for andel fullført normert tid
   normertandel_tilbod <- dbh_data(707, filters = list("Institusjonskode"=c("1175", "0257")))

@@ -5,13 +5,16 @@ options("openxlsx.numFmt" = "#,#0.00")
 ##* Rapportkode
 ##* 
 ##* # deler fritekstdata i filer gruppert på institutt
-OM_fritekst_xlsx_2022 <- function(sdf, fritekstvariabler, grupperingsvariabel, surveynamn, data_ar) {
+OM_fritekst_xlsx_2022 <- function(sdf, fritekstvariabler, grupperingsvariabel, surveynamn, data_ar, n_grupperingsvariabler = 4) {
   tabell_stil <- createStyle(wrapText = T, valign = "top")
   svarkol_stil <- createStyle(numFmt = "TEXT")
 
+  n_observasjonsvariabler <- n_grupperingsvariabler - 1
+  
   # Sjekkar kor mange svar det er i fritekstvariablane, for å kontrollere mot enkeltfilene
   # Føreset at dei første tre kolonnane i datasettet er grupperingskolonnar
   # (Fakultet, programkode, programnamn)
+  # sdf <- sdf %>% group_by(!!grupperingsvariabel) %>% select(!!!fritekstvariabler)
   sdf <- sdf %>% group_by(!!grupperingsvariabel) %>% select(!!!fritekstvariabler)
   print(sdf %>% names)
   
@@ -20,7 +23,8 @@ OM_fritekst_xlsx_2022 <- function(sdf, fritekstvariabler, grupperingsvariabel, s
   sdf <- sdf %>% mutate(across(where(is.character), ~gsub("\n", " ", .)))
   sdf <- sdf %>% mutate(across(where(is.character), str_trim))
   
-  sum_svar_datasett <- rowSums(!is.na(sdf[-(1:3)])) %>% sum
+  # OBS må endrast om ein har fleire eller færre identifiserande variablar med
+  sum_svar_datasett <- rowSums(!is.na(sdf[-(1:n_grupperingsvariabler)])) %>% sum
   sum_svar_delt <- 0
   
   sdf <- sdf %>% group_split
@@ -34,13 +38,14 @@ OM_fritekst_xlsx_2022 <- function(sdf, fritekstvariabler, grupperingsvariabel, s
   for (gruppe in sdf) {
     gruppenamn <- gruppe[{{grupperingsvariabel}}] %>% unique() %>% as.character()
     print(gruppenamn)
-    # print(gruppe %>% names)
+    print(gruppe %>% names)
     # ta bort grupperingsvariabel og kolonner som er heilt tomme
     gruppe <- gruppe %>% ungroup %>% select(-{{grupperingsvariabel}})
     # print(gruppe %>% names %>% as.data.frame())
     # gruppe <- gruppe %>% filter(if_all(4:7, ~!is.na(.)))
     # TODO denne ser ut til å lage krøll, nytt forsøk i juli 2024
-    gruppe <- gruppe %>% filter(rowSums(!is.na(.)) > 2)
+    # OBS avheng av kor mange identifiserande variablar som er med
+    gruppe <- gruppe %>% filter(rowSums(!is.na(.)) > n_observasjonsvariabler)
     not_all_na <- function(x) any(!is.na(x))
     gruppe <- gruppe %>% select_if(not_all_na)
     gruppe <- gruppe %>% mutate(across(where(is.character), str_trim))
@@ -57,15 +62,17 @@ OM_fritekst_xlsx_2022 <- function(sdf, fritekstvariabler, grupperingsvariabel, s
     # Sjekkar kor mange svar det er i fritekstvariablane, for å kontrollere mot heile datasettet
     # Føreset at dei første to kolonnane er grupperingskolonnar
     # (programkode, programnamn)
+    # OBS: denne føresetnaden fungerer ikkje på Student exchange
     # print(gruppe %>% names)
-    tal_svar <- rowSums(!is.na(gruppe[-(1:2)])) %>% sum
+    # OBS TODO - fiks denne, tal_svar tar med ei kolonne frå grupperingsvariablane
+    tal_svar <- rowSums(!is.na(gruppe[-(1:n_observasjonsvariabler)])) %>% sum
     sum_svar_delt <- sum_svar_delt + tal_svar
     
     ## stil
     datalengde <- tal_svar + 1
     databreidde <- ncol(gruppe)
     # TODO Finn ein måte å bestemme dette frå Shiny-appen
-    setColWidths(arbeidsbok, 1, cols = 1:11, widths = c(12, 30, 60, 60, 60, 60, 60, 60, 60, 60, 60))
+    setColWidths(arbeidsbok, 1, cols = 1:11, widths = c(18, 8, 60, 60, 60, 60, 60, 60, 60, 60, 60))
     # addStyle(arbeidsbok, 1, cols = 5, rows = 2:datalengde, svarkol_stil, gridExpand = T, stack = T)
     addStyle(arbeidsbok, 1, cols = 1:databreidde, rows = 1:datalengde, tabell_stil, gridExpand = T, stack = T)
     # print("OK4")
@@ -119,13 +126,22 @@ SB_til_hypergene <- function(datasett, utklipp = T, utklippsstorleik = "") {
   
   # Studieprogram
   SB_studieprogram <- datasett %>% group_by(BarometerProgram = Studieprogram_instnamn, Enhet = fakultet, Årstall = undersøkelse_år, Nivå) %>% summering(.)
+  # SB_studieprogram <- datasett %>% group_by(BarometerProgram = Studieprogramkode, Enhet = fakultet, Årstall = undersøkelse_år, Nivå) %>% summering(.)
   SB <- bind_rows(SB, SB_studieprogram)
   
   # Paraplyprogram
   paraplykoder <- OM_hent_paraplykoder() %>% select(Studieprogramkode, Paraplyvennleg_kode, Paraplynamn)
+  # Tilpassar så berre MAVIT blir brukt
+  paraplykoder <- paraplykoder %>% mutate(Paraplyvennleg_kode = 
+                            case_when(grepl("MAVIT", Paraplyvennleg_kode) ~ "MAVIT", 
+                                      T ~ Paraplyvennleg_kode))
+  paraplykoder <- paraplykoder %>% mutate(Paraplynamn = 
+                            case_when(grepl("Helsevitenskap", Paraplynamn) ~ "RHT/SHA Helsevitenskap", 
+                                      T ~ Paraplynamn)) 
+  
   SB_paraply <- left_join(datasett, paraplykoder, by = "Studieprogramkode") %>% filter(!is.na(Paraplyvennleg_kode))
   SB_paraply <- SB_paraply %>% group_by(BarometerProgram = Paraplynamn, Enhet = fakultet, Årstall = undersøkelse_år, Nivå) %>% summering(.)
-  
+  # return(SB_paraply)
   SB <- bind_rows(SB, SB_paraply)
   if (utklipp) {
     SB %>% til_utklipp(na_streng = "", storleik = utklippsstorleik)
@@ -447,7 +463,7 @@ OM_indikator_print_2023 <- function(sdf, malfil = "", survey = "test", aggregert
       
       # Lagre arbeidsbok    
       # rapportfil <- paste0(surveyinfo, "/", "aggregert", " ",  survey, " ", arstal_siste, ".xlsx")
-      rapportfil <- paste0(surveyinfo, "/", "aggregert", " ",  paste(survey, part), arstal_siste, ".xlsx")
+      rapportfil <- paste0(surveyinfo, "/", "aggregert", " ", paste(survey, part), arstal_siste, ".xlsx")
       print(rapportfil)
       saveWorkbook(wb = arbeidsbok,
                    file = rapportfil,
@@ -600,7 +616,7 @@ OM_indikator_print_2023 <- function(sdf, malfil = "", survey = "test", aggregert
         } # END LOOP
         
         # Lagre arbeidsbok    
-        rapportfil <- paste0(surveyinfo, "/", fakultet, " ",  survey, " ", arstal_siste, ".xlsx")
+        rapportfil <- paste0(surveyinfo, "/", fakultet, " ",  survey, " ", paste(survey, part), arstal_siste, ".xlsx")
         print(rapportfil)
         saveWorkbook(wb = arbeidsbok,
                      file = rapportfil,
@@ -1474,6 +1490,7 @@ OM_tredeltskala_tidsserie <- function(variabel, nyvariabel) {
 
 # Datapakke til kvalitetsrapport --------------------------------------------------------------
 
+# TODO oppdatere kommentarar - fjernar ikkje lenger program som ikkje er med i nyaste
 # TODO skrive om til denne måten, og til å bruke utskriftshjelparar til å bygge tabellar og skrive dei ut
 # lage lister med alle programkode frå nyaste år per undersøking
 # lage liste med alle programkode frå nyaste år for begge undersøkingar
@@ -1507,6 +1524,9 @@ datapakke_print_2024 <- function(SB_tidsserie, SA_tidsserie, part = "") {
   # Slå saman datasett
   SB_tidsserie <- bind_rows(SB_tidsserie)
   SA_tidsserie <- bind_rows(SA_tidsserie)
+  
+  # TODO bruke kople_studieprogramkode
+  # sjekk først kva program som er med i tidsserien, VERB+GVH er døme
   
   # slå saman program som har endra studieprogramkode
   SB_tidsserie <- SB_tidsserie %>% 
@@ -1745,6 +1765,7 @@ datapakke_utrad_p <- function(sdf, sisteår, forrigeår) {
   return(df_p)
 }
 
+# TODO hent inn frå Excel-mal i staden
 # Select variables helper
 datapakke_slim_variables_SB24 <- function(sdf) {
   sdf %>% select(any_of(

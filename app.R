@@ -82,6 +82,16 @@ ui <- fluidPage(
                              size = NULL
                            ),
                            varSelectInput(
+                             inputId = "observasjonsvariabler",
+                             label = "Velg variablar for å identifisere observasjon",
+                             data = NULL,
+                             selected = NULL,
+                             multiple = TRUE,
+                             selectize = TRUE,
+                             width = NULL,
+                             size = NULL
+                           ),
+                           varSelectInput(
                              inputId = "fritekstvariabler",
                              label = "Velg variablar å ta med",
                              data = NULL,
@@ -136,6 +146,7 @@ server <- function(input, output) {
   # observeEvent(fritekstdata(), {
   observeEvent(fritekstdata(), {
     # fritekstdata <- read_excel(input$fritekstfil$datapath)
+    updateVarSelectInput(inputId = "observasjonsvariabler", data = fritekstdata())
     updateVarSelectInput(inputId = "fritekstvariabler", data = fritekstdata())
     updateVarSelectInput(inputId = "programvariabel", data = fritekstdata())
     updateVarSelectInput(inputId = "grupperingsvariabel", data = fritekstdata())
@@ -146,7 +157,8 @@ server <- function(input, output) {
     # print(fritekstdata() %>% names)
     # print(input$programvariabel)
     # fritekstdata_dbh <- 
-    fritekstdata(fritekstdata() %>% dbh_add_programdata(., as.character(input$programvariabel), 1175))
+    fritekstdata(fritekstdata() %>% dbh_add_programdata(., as.character(input$programvariabel), "1175"))
+    updateVarSelectInput(inputId = "observasjonsvariabler", data = fritekstdata())
     updateVarSelectInput(inputId = "fritekstvariabler", data = fritekstdata())
     updateVarSelectInput(inputId = "programvariabel", data = fritekstdata())
     updateVarSelectInput(inputId = "grupperingsvariabel", data = fritekstdata())
@@ -161,12 +173,23 @@ server <- function(input, output) {
   # slik at utskrift blir skilt frå å lage arbeidsbok
   observeEvent(input$downloadOpenAnswers, {
     # output$downloadOpenAnswers <- downloadHandler({
-  
+    # print(input$observasjonsvariabler %>% length)
+    # print(input$observasjonsvariabler)
+    # print(append(input$observasjonsvariabler, input$fritekstvariabler))
+    # return()
+    
+    # Lagrar talet på variablar som ikkje er fritekst (grupperingsvariabel + observasjonsvariablar)
+    n_var <- input$observasjonsvariabler %>% length + 1
+    # lagar ny vektor med variablane som skal brukast
+    utskriftsvariabler <- append(input$observasjonsvariabler, input$fritekstvariabler)
+    
     sdf <- OM_fritekst_xlsx_2022(sdf = fritekstdata(),
+                                 # fritekstvariabler = input$fritekstvariabler,
                                  fritekstvariabler = input$fritekstvariabler,
                                  grupperingsvariabel = input$grupperingsvariabel,
                                  surveynamn = input$surveynamn,
-                                 data_ar = input$data_ar)
+                                 data_ar = input$data_ar,
+                                 n_grupperingsvariabler = n_var)
     # print(sdf %>% head)
     
   })
@@ -187,11 +210,13 @@ server <- function(input, output) {
     print(paste("Undersøking:", surveyname, "– Nivå:", levelfilter, "– Bruk paraplyprogramkoder:", paraplyprogram, sep = " " ))
     
     # TODO: legg inn case for å sjekke om ein skal bruke SA_prepare, SB_prepare eller OM_prepare
-    df <- SB_prepare_2024(input$nyastedata$datapath, input$nyastear, input$instnr, brukParaplykoder = paraplyprogram)
+    # df <- SB_prepare_2024(input$nyastedata$datapath, input$nyastear, input$instnr, brukParaplykoder = paraplyprogram)
+    df <- SB_prepare_2024_med_DBH(input$nyastedata$datapath, input$nyastear, input$instnr, brukParaplykoder = paraplyprogram)
     print("Eventuelle programkoder utan Fakultetstilknytning: ") 
     print(df %>% filter(is.na(FAKNAVN)) %>% select(Studieprogramkode) %>% 
             unique)
-    df_previous <- SB_prepare_2024(input$forrigedata$datapath, input$forrigear, input$instnr, brukParaplykoder = paraplyprogram)
+    # df_previous <- SB_prepare_2024(input$forrigedata$datapath, input$forrigear, input$instnr, brukParaplykoder = paraplyprogram)
+    df_previous <- SB_prepare_2024_med_DBH(input$forrigedata$datapath, input$forrigear, input$instnr, brukParaplykoder = paraplyprogram)
     
     workbook <- OM_print_2023(survey = surveyname, source_df = df, source_df_forrige = df_previous,
                               malfil = templatepath, nivå = levelfilter)

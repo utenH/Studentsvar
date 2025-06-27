@@ -41,6 +41,12 @@ OM_studiestart_filtrer_nivå <- function(sdf, nivå = "bama") {
   if (nivå == "bama") {
     sdf <- sdf %>% filter(!grepl("Års|pedag|forku|Høg", studieniva))
   }
+  if (nivå == "syklus1") {
+    sdf <- sdf %>% filter(grepl("Bachelor|peda|Års", studieniva))
+  }
+  if (nivå == "syklus2") {
+    sdf <- sdf %>% filter(grepl("Master", studieniva))
+  }
   if (nivå == "andre") {
     sdf <- sdf %>% filter(!grepl("Bachelor|Master", studieniva))
   }
@@ -137,33 +143,37 @@ OM_prepare_studiestart_2023 <- function(innfil = "../datafiler/studiestart/Studi
 ##* Studiestart
 ##* bruk EXC_tabell_meirinfo for å lage tabell om informasjon studentar sakna
 
-OM_prepare_exchangestudents_2023 <- function(innfil = "../datafiler/exchangestudents/exchangestudents_h2023_data.xlsx", dataår = 2023) {
+OM_prepare_exchangestudents_2024 <- function(innfil = "../datafiler/exchangestudents/StudentExchange_H2024_rådata.xlsx", dataår = 2024) {
   OM <- read_excel(innfil)
   OM <- OM %>% clean_names
-  OM %>% names %>% print
+  # OM %>% names %>% print
   OM <- OM %>% mutate(undersokelse_år = dataår)
   OM <- OM %>% mutate(gruppe_ar = undersokelse_år)
   OM <- OM %>% rename(Fakultetsnavn = fakultet)
   OM <- OM %>% rename(Institutt = institutt)
-  OM <- OM %>% rename(Studieprogramkode = programkode)
+  # OM <- OM %>% rename(Studieprogramkode = programkode)
   OM <- OM %>% rename(Studietilbud = programnavn)
-  OM <- OM %>% mutate(Studieprogram_instnamn = paste(Institutt, Studieprogramkode, Studietilbud))
+  # OM <- OM %>% mutate(Studieprogram_instnamn = paste(Institutt, Studieprogramkode, Studietilbud))
+  OM <- OM %>% mutate(Studieprogram_instnamn = paste(Institutt, Studietilbud))
   OM <- OM %>% mutate(Institusjon = "OsloMet")
   OM <- OM %>% mutate(Fakultet_ar = paste(Fakultetsnavn, gruppe_ar))
   OM <- OM %>% mutate(OM_ar = paste("OsloMet", gruppe_ar))
   
+  # Fjerne kolonner som er lagra som ulike typar i ulike år
+  OM <- OM %>% select(-any_of(c("date_submitted", "date_last_action", "total_time")))
+  
   # Omkoding
-  svar_nivå <- c("1 – i liten grad", "2", "3", "4", "5 – i stor grad")
-  OM <- OM %>% OM_text_to_factor(to_what_extent_are_you_satisfied_with_the_admission_process_to_oslo_met_application_admission_and_acceptance)
-  OM <- OM %>% OM_text_to_factor(to_what_extent_are_you_satisfied_with_the_information_you_received_before_you_started)
+  svar_nivå <- c("1 – to a little extent", "2", "3", "4", "5 – to a large extent")
+  OM <- OM %>% OM_text_to_factor(how_satisfied_are_you_with_the_admission_process_to_oslo_met_application_admission_and_acceptance)
+  OM <- OM %>% OM_text_to_factor(how_satisfied_are_you_with_the_information_you_received_before_you_started)
   OM <- OM %>% OM_text_to_factor(to_what_extent_do_you_agree_with_the_following_statements_i_consider_myself_a_part_of_a_student_environment_in_my_studies)
-  OM <- OM %>% OM_text_to_factor(to_what_extent_do_you_agree_with_the_following_statements_my_course_courses_has_facilitated_various_group_activities)
-  OM <- OM %>% OM_text_to_factor(to_what_extent_do_you_agree_with_the_following_statements_the_academic_and_social_activities_in_my_course_courses_have_helped_me_get_to_know_fellow_students)
-  OM <- OM %>% OM_text_to_factor(to_what_extent_do_you_agree_with_the_following_statements_i_have_someone_to_discuss_and_collaborate_with_outside_of_my_course_courses)
-  OM <- OM %>% OM_text_to_factor(to_what_extent_do_you_agree_with_the_following_statements_i_have_someone_in_my_course_courses_i_can_talk_with_about_challenges_i_experience_as_a_student)
+  OM <- OM %>% OM_text_to_factor(to_what_extent_do_you_agree_with_the_following_statements_my_course_s_has_facilitated_various_group_activities)
+  OM <- OM %>% OM_text_to_factor(to_what_extent_do_you_agree_with_the_following_statements_the_academic_and_social_activities_in_my_course_s_have_helped_me_get_to_know_fellow_students)
+  OM <- OM %>% OM_text_to_factor(to_what_extent_do_you_agree_with_the_following_statements_i_have_someone_to_discuss_and_collaborate_with_outside_of_my_course_s)
+  OM <- OM %>% OM_text_to_factor(to_what_extent_do_you_agree_with_the_following_statements_i_have_someone_in_my_course_s_i_can_talk_with_about_challenges_i_experience_as_a_student)
   OM <- OM %>% OM_text_to_factor(to_what_extent_do_you_agree_with_the_following_statements_i_feel_treated_equally_to_local_students)
-  OM <- OM %>% OM_text_to_factor(to_what_extent_do_you_agree_with_the_following_statements_i_feel_that_i_am_able_to_keep_up_with_the_academic_requirements_in_course_courses_so_far)
-  OM <- OM %>% OM_text_to_factor(to_what_extent_do_you_agree_with_the_following_statements_the_academic_content_of_my_course_courses_has_met_my_expectations_so_far)
+  OM <- OM %>% OM_text_to_factor(to_what_extent_do_you_agree_with_the_following_statements_i_am_able_to_keep_up_with_the_academic_requirements_in_my_course_s_so_far)
+  OM <- OM %>% OM_text_to_factor(to_what_extent_do_you_agree_with_the_following_statements_the_academic_content_of_my_course_s_has_met_my_expectations_so_far)
 
   # Ja/Nei/Veit ikkje
   # did_you_use_the_course_catalogue_on_oslomet_no_before_deciding_what_courses_you_wanted_to_apply_for
@@ -177,9 +187,12 @@ OM_prepare_exchangestudents_2023 <- function(innfil = "../datafiler/exchangestud
   #                              labels = c("Ja", "Nei", "Vet ikke"),
   #                              ordered = T))
   janeiv <- c("Yes", "No", "Do not know")
-  OM <- OM_lag_faktor(OM, did_you_use_the_course_catalogue_on_oslomet_no_before_deciding_what_courses_you_wanted_to_apply_for, janeiv)
+  OM <- OM_lag_faktor(OM, did_you_use_the_course_catalogue_on_oslomet_no_before_deciding_what_course_s_you_wanted_to_apply_for, janeiv)
   OM <- OM_lag_faktor(OM, are_you_satisfied_with_the_academic_support_you_have_received_so_far, janeiv)
   OM <- OM_lag_faktor(OM, do_you_have_any_inclusion_needs, janeiv)
+  if ("do_you_receive_any_assistance_from_oslo_met_in_order_to_meet_your_inclusion_needs" %in% (OM %>% names)) {
+    OM <- OM_lag_faktor(OM, do_you_receive_any_assistance_from_oslo_met_in_order_to_meet_your_inclusion_needs, janeiv)
+  }
   OM <- OM_lag_faktor(OM, gender, c("Female", "Male", "Other", "Do not wish to answer"))
   OM <- OM_lag_faktor(OM, what_is_your_age, c("Under 21 years", "21-24 years","25-30 years", "31-40 years", "Do not wish to answer"))
   
@@ -211,10 +224,20 @@ OM_prepare_exchangestudents_2023 <- function(innfil = "../datafiler/exchangestud
 
 # Gjer dette utanom, for enkelheits skuld
 EXC_tabell_meirinfo <- function(sdf) {
-  sdf %>% group_by(fakultet) %>% summarise(across(starts_with("what_do_you_wish_you_had"), ~sum(. == "Yes"))) %>% 
+  sdf <- sdf %>% group_by(Fakultetsnavn) %>% summarise(across(starts_with("what_do_you_wish_you_had"), ~sum(. == "Yes"))) %>% 
     set_names(c("Fakultet", "Admission", "International coordinator", "Buddy", "Pre-arrival"))
   return(sdf)
 }
+
+EXC_fritekstvar_2024 <- c("what_kind_of_information_in_the_course_catalogue_helped_you_decide_what_course_s_to_apply_for",
+                          "in_what_way_do_you_feel_that_are_you_treated_differently_than_local_students",
+                          "can_you_explain_in_what_way_the_academic_content_of_your_course_s_has_not_met_your_expectations",
+                          "what_kind_of_academic_support_do_you_miss",
+                          "what_kind_of_academic_support_have_you_received",
+                          "will_you_tell_us_in_a_few_words_what_kind_of_assistance_you_receive_and_how_adequate_it_is",
+                          "will_you_tell_us_in_a_few_words_what_kind_of_assistance_you_have_applied_for_but_not_received",
+                          "do_you_have_any_advice_or_feedback_that_will_help_oslo_met_give_future_exchange_students_a_better_learning_experience_at_oslo_met"
+)
 
 ###* 
 ##* Studiebarometeret
@@ -226,8 +249,7 @@ SB_prepare_2024 <- function(innfil, dataår, instnr, kopleprogramdata = T, brukP
   # I 2022 inneheldt datasettet nokre observasjonar utan studprog_kod/studiepgm_navn
   # Filtrerer bort slike
   OM <- OM %>% filter(!is.na("Studieprogramkode"))
-  OM <- OM %>% filter(STUDIEAR != 3 | is.na(STUDIEAR))
-  OM <- OM %>% filter(Studieprogramkode != "M1GSP")
+  OM <- OM %>% filter(STUDIEAR != 3)
   
   OM[OM==9999] <- NaN # Var NA, bytta 2020 for å skilje mellom ikkje-svar (NA) og Vet ikke (NaN)
   OM <- SB_name_fak_kort(OM)
@@ -269,6 +291,7 @@ SB_prepare_2024_med_DBH <- function(innfil, dataår, instnr, kopleprogramdata = 
   # I 2022 inneheldt datasettet nokre observasjonar utan studprog_kod/studiepgm_navn
   # Filtrerer bort slike
   OM <- OM %>% filter(!is.na(studprog_kod))
+
   OM[OM==9999] <- NaN # Var NA, bytta 2020 for å skilje mellom ikkje-svar (NA) og Vet ikke (NaN)
   OM <- SB_name_fak_kort(OM)
   
@@ -289,6 +312,18 @@ SB_prepare_2024_med_DBH <- function(innfil, dataår, instnr, kopleprogramdata = 
     }
   }
 
+  # For å reprodusere excelark frå 2023:
+  # ta med M1GSP
+  # YFLH-RM og YFLH-teknisk må ha tid_brutto eller progresjon sett til NA
+  # OM <- OM %>% mutate(STUDIEAR = case_when(Studieprogramkode == "M1GSP" ~ 2, T ~ STUDIEAR))
+  # OM <- OM %>% mutate(progresjon = case_when(Studieprogramkode == "YFLH-RM" ~ NA,
+  #                                            Studieprogramkode == "YFLH-teknisk" ~ NA, 
+  #                                            T ~ progresjon))
+
+  # Handterer surr med 3. studieår
+  OM <- OM %>% filter(!is.na("Studieprogramkode"))
+  OM <- OM %>% filter(STUDIEAR != 3)
+  
   OM <- OM_janei_bin_sane(OM, forstevalg_studprog_23)
   OM <- SB_plan_fullføring(OM)
   OM <- OM_null_til_en_indeksering(OM, bruker_ki_23)
@@ -544,9 +579,9 @@ SA_tilpassdata_2022 <- function(sdf) {
   
   return(sdf)
 }
+
 ##**
 ##* DBH-funksjonar 
-library(rdbhapi)
 
 ##**
 ##* Hjelpefunksjon for å skrive ut metadata om tabell
@@ -595,6 +630,12 @@ dbh_add_programdata <- function(sdf, varnamn, instnr, natjoin = F) {
   sdf <- dbh_add_utdtype(sdf)
   sdf <- dbh_add_progresjon(sdf, `Andel av heltid`)
   sdf <- sdf %>% rename(progresjon = `Andel av heltid`)
+  
+  sdf <- sdf %>% mutate(progresjon = case_when(
+    grepl("YFL", Studieprogramkode) ~ 1,
+    T ~ progresjon
+  ))
+  
   # TODO - vurder søk og fjern av
   # "Master i", Masterstudium i ", Master Programme in ", "Master's Degree Programme in "
   # "Bachelorstudium i ", "Bachelorstudium - " 
@@ -617,7 +658,7 @@ dbh_add_programnavn <- function(sdf, varnamn) {
 
 ##**
 ##* Hentar data frå DBH, til å slå saman med andre datasett 
-dbh_hent_programdata <- function(instnr = 1175) {
+dbh_hent_programdata <- function(instnr = "1175") {
   dbh_vars <- c("Studieprogramkode", 
                 "Studieprogramnavn",
                 "Avdelingskode",
@@ -629,8 +670,7 @@ dbh_hent_programdata <- function(instnr = 1175) {
                 "Studiepoeng")
   dbh_programdata <- dbh_data(347, 
                               filters = c("Institusjonskode" = instnr), 
-                              variables = dbh_vars, 
-                              group_by = dbh_vars) %>%
+                              variables = dbh_vars) %>%
     arrange(desc(Årstall)) %>% distinct(Studieprogramkode, .keep_all = T)
   
   # For å handtere samanslåing av institutt
@@ -682,15 +722,14 @@ dbh_hent_programdata <- function(instnr = 1175) {
 }
 
 ##** Hentar ein tabell med instituttnamn, kan koplast på kolonna Avdelingskode 
-dbh_hent_orgdata <- function(instnr = 1175) {
+dbh_hent_orgdata <- function(instnr = "1175") {
   sdf <- dbh_data(457, filters = c("Institusjonskode" = instnr, "Årstall" = "2023"), 
-                  variables = c("Avdelingskode", "Avdelingskode_SSB", "Avdelingsnavn", "Årstall"), 
-                  group_by = c("Avdelingskode", "Avdelingskode_SSB", "Avdelingsnavn", "Årstall")) %>% 
+                  variables = c("Avdelingskode", "Avdelingsnavn", "Årstall")) %>% 
     # Alternativ måte: sjekke om Avdelingskode_SSB sluttar med 00, det er instituttnivå, 000 og opp må også bort?
     # filter(as.numeric(Avdelingskode) %% 100 == 0 & as.numeric(Avdelingskode) %% 1000 != 0 & as.numeric(Avdelingskode) %% 10000 != 0) %>%
     filter(grepl("^Institutt for|^Handelshøyskolen", Avdelingsnavn)) %>%
     mutate(Fakultetskode = strtrim(Avdelingskode, 3)) %>% 
-    arrange(Avdelingsnavn) %>% select(Avdelingskode, Avdelingskode_SSB, Fakultetskode, Institutt = Avdelingsnavn)
+    arrange(Avdelingsnavn) %>% select(Avdelingskode, Fakultetskode, Institutt = Avdelingsnavn) %>% unique()
   
   # For å handtere samanslåing av institutt
   if (instnr == 1175) {
@@ -701,7 +740,9 @@ dbh_hent_orgdata <- function(instnr = 1175) {
   }
   
   # Hentar tabell med fakultetskode og -namn
-  dbh_210 <- dbh_data(210, group_by = "*") %>% filter(Institusjonskode == instnr) %>%
+  # måtte ei stund bruke group_by = "*" fordi rdbhapi hadde endra seg
+  # dbh_210 <- dbh_data(210, group_by = "*") %>% filter(Institusjonskode == instnr) %>%
+  dbh_210 <- dbh_data(210) %>% filter(Institusjonskode == instnr) %>%
     select(Fakultetskode, Fakultetsnavn) %>% unique() %>% arrange(Fakultetskode)
   
   # Forkorte fakultetsnamn - flytta til dbh_hent_programdata()
@@ -821,6 +862,8 @@ kople_studieprogramkode <- function(sdf, programvariabel = Studieprogramkode, vi
         {{programvariabel}} == "SYPLGR" ~ "SYKP+SYPLGR",
         {{programvariabel}} == "GVH" ~ "VERB+GVH",
         {{programvariabel}} == "VERB" ~ "VERB+GVH",
+        # {{programvariabel}} == "MALKD" ~ "MALKS+MALKD",
+        # {{programvariabel}} == "MALKS" ~ "MALKS+MALKD",
         TRUE ~ {{programvariabel}}))
     # TODO legg til dei siste som variantar for samanslått kode 
   }
@@ -840,8 +883,8 @@ kople_studieprogramkode <- function(sdf, programvariabel = Studieprogramkode, vi
         {{programvariabel}} == "MAPO" ~ "MAEMP",
         {{programvariabel}} == "MASE" ~ "MAPHN",
         {{programvariabel}} == "MAPSYKHD4" ~ "MAPSY",
-        grepl("MASYKV|MASYKVD4", {{programvariabel}}) ~ "MAKLI",
-        grepl("MALKS|MALKD", {{programvariabel}}) ~ "MALK",
+        # grepl("MASYKV|MASYKVD4", {{programvariabel}}) ~ "MAKLI",
+        # grepl("MALKS|MALKD", {{programvariabel}}) ~ "MALK",
         TRUE ~ {{programvariabel}}))
   }
   return(sdf)
@@ -918,9 +961,9 @@ OM_add_bakgrunnsdata <- function(sdf, varnamn) {
                    by = {{varnamn}})
   
   sdf <- sdf %>% mutate(Institutt = case_when(
-    grepl("YFL", !!varnamn) ~ "YLU",
-    grepl("MAFYS", !!varnamn) ~ "RHT",
-    grepl("MAPO", !!varnamn) ~ "SHA",
+    grepl("YFL", .data[[varnamn]]) ~ "YLU",
+    grepl("MAFYS", .data[[varnamn]]) ~ "RHT",
+    grepl("MAPO", .data[[varnamn]]) ~ "SHA",
     T ~ Institutt
   ))
   
