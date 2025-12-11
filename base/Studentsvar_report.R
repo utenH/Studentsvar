@@ -471,6 +471,100 @@ OM_indikator_print_2023 <- function(sdf, malfil = "", survey = "test", aggregert
       saveWorkbook(wb = arbeidsbok,
                    file = rapportfil,
                    overwrite = TRUE)
+    } else if (instituttrapport) {
+      # Utskrift av institutt, fakultet og OsloMet-nivå
+      # Test å bruke ein intern funksjon her
+      # print_aggregert() 
+      
+      # lag ny arbeidsbok sn == arknummer
+      sn <- 1
+      arbeidsbok <- createWorkbook()
+      
+      # loop gjennom rad for rad, legg til fane i arbeidsbok
+      for (rad in seq(from = 1, nrow((utskriftsmal)))) {
+        # sr = radnummer
+        sr <- 1
+        # sc = kolonnenummer
+        sc <- 1
+        # Legg til arkfane med tittel
+        addWorksheet(arbeidsbok, sheetName = utskriftsmal[rad, "Arkfanetittel"])
+        
+        # Skriv ut spørsmålstekst til arket
+        writeData(arbeidsbok, sheet = sn, x = utskriftsmal[rad, "Spørsmålstekst"], startCol = sc, startRow = sr)
+        
+        if (!is.na(utskriftsmal[rad, "Kommentar"])) {
+          sr <- sr + 1
+          writeData(arbeidsbok, sheet = sn, x = utskriftsmal[rad, "Kommentar"], startCol = sc, startRow = sr)
+        }
+        sr <- sr + 2
+        
+        # velg utskrift basert på utskriftsmal[rad, "Svartype"]
+        if (utskriftsmal[rad, "Svartype"] == "fordeling") {
+          df_ut_institutt <- print_fordeling(sdf_full %>% group_by(Institutt_ar), utskriftsmal[rad, "Variabel"])
+          df_ut_fakultet <- print_fordeling(sdf_full %>% group_by(Fakultet_ar), utskriftsmal[rad, "Variabel"])
+          df_ut_OM <- print_fordeling(sdf_full %>% group_by(OM_ar), utskriftsmal[rad, "Variabel"])
+        } else if(utskriftsmal[rad, "Svartype"] == "snitt_as_num" | utskriftsmal[rad, "Svartype"] == "snitt") {
+          df_ut_institutt <- print_snitt_as_num(sdf_full %>% group_by(Institutt), utskriftsmal[rad, "Variabel"], arstal_eldre, arstal_siste)
+          df_ut_fakultet <- print_snitt_as_num(sdf_full %>% group_by(Fakultetsnavn), utskriftsmal[rad, "Variabel"], arstal_eldre, arstal_siste)
+          df_ut_OM <- print_snitt_as_num(sdf_full %>% group_by(Institusjon), utskriftsmal[rad, "Variabel"], arstal_eldre, arstal_siste)
+        } else if (utskriftsmal[rad, "Svartype"] == "fordeling_single") {
+          df_ut_institutt <- print_fordeling(sdf_full %>% filter(gruppe_ar == arstal_siste) %>% group_by(Institutt), utskriftsmal[rad, "Variabel"])
+          df_ut_fakultet <- print_fordeling(sdf_full %>% filter(gruppe_ar == arstal_siste) %>% group_by(Fakultetsnavn), utskriftsmal[rad, "Variabel"])
+          df_ut_OM <- print_fordeling(sdf_full %>% filter(gruppe_ar == arstal_siste) %>% group_by(Institusjon), utskriftsmal[rad, "Variabel"])
+        } else if(utskriftsmal[rad, "Svartype"] == "snitt_as_num_single") {
+          df_ut_institutt <- print_snitt_as_num_single(sdf_full %>% group_by(Institutt), utskriftsmal[rad, "Variabel"], arstal_siste)
+          df_ut_fakultet <- print_snitt_as_num_single(sdf_full %>% group_by(Fakultetsnavn), utskriftsmal[rad, "Variabel"], arstal_siste)
+          df_ut_OM <- print_snitt_as_num_single(sdf_full %>% group_by(Institusjon), utskriftsmal[rad, "Variabel"], arstal_siste)
+        } else if(utskriftsmal[rad, "Svartype"] == "snitt_as_num_serie") {
+          df_ut_institutt <- print_snitt_as_num_serie(sdf_full %>% group_by(Institutt), utskriftsmal[rad, "Variabel"], "undersokelse_ar")
+          df_ut_fakultet <- print_snitt_as_num_serie(sdf_full %>% group_by(Fakultetsnavn), utskriftsmal[rad, "Variabel"], "undersokelse_ar")
+          df_ut_OM <- print_snitt_as_num_serie(sdf_full %>% group_by(Institusjon), utskriftsmal[rad, "Variabel"], "undersokelse_ar")
+        }
+        
+        # Instituttnivå
+        # Snur tabellen for å få rett rekkefølgje i graf
+        # df_ut_fakultet <- df_ut_fakultet %>% arrange(desc(across(1)))
+        
+        writeData(arbeidsbok, sheet = sn, x = df_ut_institutt, startCol = sc, startRow = sr, colNames = T, keepNA = T)
+        sr <- sr + nrow(df_ut_institutt) + 1
+        
+        # Fakultetsnivå
+        # Snur tabellen for å få rett rekkefølgje i graf
+        # df_ut_fakultet <- df_ut_fakultet %>% arrange(desc(across(1)))
+        
+        # writeData(arbeidsbok, sheet = sn, x = df_ut_fakultet, startCol = sc, startRow = sr, colNames = T, keepNA = T)
+        # sr <- sr + nrow(df_ut_fakultet) + 1
+        
+        # OsloMet-nivå
+        # Snur tabellen for å få rett rekkefølgje i graf
+        # df_ut_OM <- df_ut_OM %>% arrange(desc(across(1)))
+        writeData(arbeidsbok, sheet = sn, x = df_ut_OM, startCol = sc, startRow = sr, colNames = F, keepNA = T)
+        
+        # Formater breidde første kolonne
+        setColWidths(
+          arbeidsbok,
+          sn,
+          cols = 1,
+          widths = 45
+        )
+        
+        # gjer klar til neste ark
+        sn <- sn + 1
+        
+        # Til bruk i formatering - om det er snitt eller prosent, f.eks.
+        if (F) {
+          
+        } 
+      } # END LOOP
+      
+      # Lagre arbeidsbok    
+      # rapportfil <- paste0(surveyinfo, "/", "aggregert", " ",  survey, " ", arstal_siste, ".xlsx")
+      rapportfil <- paste0(surveyinfo, "/", "aggregert", " ", paste(survey, part), arstal_siste, ".xlsx")
+      print(rapportfil)
+      saveWorkbook(wb = arbeidsbok,
+                   file = rapportfil,
+                   overwrite = TRUE)
+      
     } else {
       # loopar gjennom fakultet, skriv ut arbeidsbok
       for (fakultet in sdf$Fakultetsnavn %>% unique %>% sort) {

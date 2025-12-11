@@ -61,6 +61,7 @@ OM_prepare_studiestart_2024 <- function(innfil = "../datafiler/studiestart/Studi
   OM <- OM %>% mutate(gruppe_ar = undersokelse_år)
   OM <- OM %>% rename(Fakultetsnavn = fakultet)
   OM <- OM %>% mutate(Fakultet_ar = paste(Fakultetsnavn, gruppe_ar))
+  OM <- OM %>% mutate(Institutt_ar = paste(Institutt, gruppe_ar))
   OM <- OM %>% rename(Studieprogramkode = programkode)
   OM <- OM %>% rename(Studietilbud = programnavn)
   OM <- OM_add_bakgrunnsdata(OM, "Studieprogramkode")
