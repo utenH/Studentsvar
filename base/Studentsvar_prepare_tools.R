@@ -53,7 +53,7 @@ OM_studiestart_filtrer_nivå <- function(sdf, nivå = "bama") {
   return(sdf)
 }
 
-OM_prepare_studiestart_2025 <- function(innfil = "../datafiler/studiestart/Studiestart 2025.xlsx", dataår = 2025) {
+OM_prepare_studiestart_2024 <- function(innfil = "../datafiler/studiestart/Studiestart 2024.xlsx", dataår = 2024) {
   OM <- read_excel(innfil)
   OM <- OM %>% clean_names
   OM %>% names %>% print
@@ -77,7 +77,7 @@ OM_prepare_studiestart_2025 <- function(innfil = "../datafiler/studiestart/Studi
   OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_de_faglige_og_sosiale_aktivitetene_pa_studiet_har_bidratt_til_at_jeg_har_blitt_kjent_med_medstudenter, svar_nivå)
   OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_jeg_har_noen_a_diskutere_og_samarbeide_med_utenom_det_faglige_opplegget_pa_studiet_mitt, svar_nivå)
   OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_jeg_har_noen_pa_studiet_mitt_jeg_kan_snakke_med_om_utfordringer_jeg_opplever_som_student, svar_nivå)
-  OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_jeg_opplever_at_jeg_henger_med_faglig_pa_studiet_mitt, svar_nivå)
+  OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_jeg_opplever_at_jeg_henger_med_faglig_i_studiet_mitt, svar_nivå)
   OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_det_faglige_innholdet_pa_studiet_svarer_sa_langt_til_mine_forventinger, svar_nivå)
   
   OM <- OM %>% OM_janei_bin_nyvar(svar = ser_du_for_deg_at_du_kommer_til_a_fullfore_dette_studiet,
@@ -193,8 +193,7 @@ OM_prepare_exchangestudents_2024 <- function(innfil = "../datafiler/exchangestud
   if ("do_you_receive_any_assistance_from_oslo_met_in_order_to_meet_your_inclusion_needs" %in% (OM %>% names)) {
     OM <- OM_lag_faktor(OM, do_you_receive_any_assistance_from_oslo_met_in_order_to_meet_your_inclusion_needs, janeiv)
   }
-  # Kjønn tatt ut som variabel H2025
-  # OM <- OM_lag_faktor(OM, gender, c("Female", "Male", "Other", "Do not wish to answer"))
+  OM <- OM_lag_faktor(OM, gender, c("Female", "Male", "Other", "Do not wish to answer"))
   OM <- OM_lag_faktor(OM, what_is_your_age, c("Under 21 years", "21-24 years","25-30 years", "31-40 years", "Do not wish to answer"))
   
   # OM <- OM %>% OM_janei_bin_nyvar(svar = did_you_use_the_course_catalogue_on_oslomet_no_before_deciding_what_courses_you_wanted_to_apply_for,
@@ -666,13 +665,12 @@ dbh_hent_programdata <- function(instnr = "1175") {
                 "Nivåkode", 
                 "Årstall", 
                 "Andel av heltid", 
-                "Andel praksis",
+                # "Andel praksis",
                 "Tilbys til",
                 "Studiepoeng")
-  dbh_programdata <- dbh_data(347,
-                              filters = c("Institusjonskode" = instnr),
+  dbh_programdata <- dbh_data(347, 
+                              filters = c("Institusjonskode" = instnr), 
                               variables = dbh_vars) %>%
-  # dbh_programdata <- OM_hent_programdata() %>% select(all_of(dbh_vars)) %>%
     arrange(desc(Årstall)) %>% distinct(Studieprogramkode, .keep_all = T)
   
   # For å handtere samanslåing av institutt
@@ -850,11 +848,6 @@ OM_hent_instituttliste <- function() {
   read_excel("base/OsloMet_instituttvariabler.xlsx", col_types = "text")
   
 }
-
-# hentar programdata i nedlasta fil frå DBH
-OM_hent_programdata <- function() {
-  read_excel("base/DBH_programdata.xlsx", col_types = "text")  
-}
 ##** 
 ##* Kodar om Studieprogramkode, for å kunne vise eldre data saman med nytt program
 ##* vis_samla_kode gir moglegheit til å velje å vise berre nyaste studieprogramkode, eller samanslått
@@ -971,8 +964,6 @@ OM_add_bakgrunnsdata <- function(sdf, varnamn) {
     grepl("YFL", .data[[varnamn]]) ~ "YLU",
     grepl("MAFYS", .data[[varnamn]]) ~ "RHT",
     grepl("MAPO", .data[[varnamn]]) ~ "SHA",
-    grepl("MAPSYH", .data[[varnamn]]) ~ "SHA",
-    grepl("SYKD", .data[[varnamn]]) ~ "SHA",
     T ~ Institutt
   ))
   
