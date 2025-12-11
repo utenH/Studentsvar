@@ -29,6 +29,7 @@ OM_fritekst_xlsx_2022 <- function(sdf, fritekstvariabler, grupperingsvariabel, s
   
   sdf <- sdf %>% group_split
   print(sdf %>% length)
+  # print(sdf)
   arbeidsboker <- list()
   
   surveyinfo <- paste(surveynamn, "fritekst", data_ar)
@@ -49,8 +50,10 @@ OM_fritekst_xlsx_2022 <- function(sdf, fritekstvariabler, grupperingsvariabel, s
     not_all_na <- function(x) any(!is.na(x))
     gruppe <- gruppe %>% select_if(not_all_na)
     gruppe <- gruppe %>% mutate(across(where(is.character), str_trim))
-    # print(paste("OK", colnames(gruppe)[1]))
+    print(gruppe)
+    print(paste("OK", colnames(gruppe)[1]))
     førstekolonne <- colnames(gruppe)[1]
+    # print(førstekolonne)
     # print("OK1")
     gruppe <- gruppe %>% arrange(.data[[førstekolonne]])
     # print("OK2")
@@ -72,7 +75,7 @@ OM_fritekst_xlsx_2022 <- function(sdf, fritekstvariabler, grupperingsvariabel, s
     datalengde <- tal_svar + 1
     databreidde <- ncol(gruppe)
     # TODO Finn ein måte å bestemme dette frå Shiny-appen
-    setColWidths(arbeidsbok, 1, cols = 1:11, widths = c(18, 8, 60, 60, 60, 60, 60, 60, 60, 60, 60))
+    setColWidths(arbeidsbok, 1, cols = 1:11, widths = c(18, 18, 60, 60, 60, 60, 60, 60, 60, 60, 60))
     # addStyle(arbeidsbok, 1, cols = 5, rows = 2:datalengde, svarkol_stil, gridExpand = T, stack = T)
     addStyle(arbeidsbok, 1, cols = 1:databreidde, rows = 1:datalengde, tabell_stil, gridExpand = T, stack = T)
     # print("OK4")
@@ -616,7 +619,8 @@ OM_indikator_print_2023 <- function(sdf, malfil = "", survey = "test", aggregert
         } # END LOOP
         
         # Lagre arbeidsbok    
-        rapportfil <- paste0(surveyinfo, "/", fakultet, " ",  survey, " ", paste(survey, part), arstal_siste, ".xlsx")
+        # rapportfil <- paste0(surveyinfo, "/", fakultet, " ",  survey, " ", paste(survey, part), arstal_siste, ".xlsx")
+        rapportfil <- paste0(surveyinfo, "/", paste(fakultet, survey, part), arstal_siste, ".xlsx")
         print(rapportfil)
         saveWorkbook(wb = arbeidsbok,
                      file = rapportfil,
