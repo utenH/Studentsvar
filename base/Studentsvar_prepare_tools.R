@@ -53,7 +53,7 @@ OM_studiestart_filtrer_nivå <- function(sdf, nivå = "bama") {
   return(sdf)
 }
 
-OM_prepare_studiestart_2024 <- function(innfil = "../datafiler/studiestart/Studiestart 2024.xlsx", dataår = 2024) {
+OM_prepare_studiestart_2025 <- function(innfil = "../datafiler/studiestart/Studiestart 2025.xlsx", dataår = 2025) {
   OM <- read_excel(innfil)
   OM <- OM %>% clean_names
   OM %>% names %>% print
@@ -61,11 +61,11 @@ OM_prepare_studiestart_2024 <- function(innfil = "../datafiler/studiestart/Studi
   OM <- OM %>% mutate(gruppe_ar = undersokelse_år)
   OM <- OM %>% rename(Fakultetsnavn = fakultet)
   OM <- OM %>% mutate(Fakultet_ar = paste(Fakultetsnavn, gruppe_ar))
-  OM <- OM %>% mutate(Institutt_ar = paste(Institutt, gruppe_ar))
   OM <- OM %>% rename(Studieprogramkode = programkode)
   OM <- OM %>% rename(Studietilbud = programnavn)
   OM <- OM_add_bakgrunnsdata(OM, "Studieprogramkode")
   # OM <- OM %>% rename(Institutt = institutt)
+  OM <- OM %>% mutate(Institutt_ar = paste(Institutt, gruppe_ar))
   OM <- OM %>% mutate(Studieprogram_instnamn = paste(Institutt, Studieprogramkode, Studietilbud))
   OM <- OM %>% mutate(Studieprogram_instnamn_ar = paste(Studieprogram_instnamn, gruppe_ar))
   OM <- OM %>% mutate(Institusjon = "OsloMet")
@@ -78,7 +78,7 @@ OM_prepare_studiestart_2024 <- function(innfil = "../datafiler/studiestart/Studi
   OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_de_faglige_og_sosiale_aktivitetene_pa_studiet_har_bidratt_til_at_jeg_har_blitt_kjent_med_medstudenter, svar_nivå)
   OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_jeg_har_noen_a_diskutere_og_samarbeide_med_utenom_det_faglige_opplegget_pa_studiet_mitt, svar_nivå)
   OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_jeg_har_noen_pa_studiet_mitt_jeg_kan_snakke_med_om_utfordringer_jeg_opplever_som_student, svar_nivå)
-  OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_jeg_opplever_at_jeg_henger_med_faglig_i_studiet_mitt, svar_nivå)
+  OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_jeg_opplever_at_jeg_henger_med_faglig_pa_studiet_mitt, svar_nivå)
   OM <- OM %>% OM_text_to_factor(i_hvilken_grad_er_du_enig_i_folgende_pastander_det_faglige_innholdet_pa_studiet_svarer_sa_langt_til_mine_forventinger, svar_nivå)
   
   OM <- OM %>% OM_janei_bin_nyvar(svar = ser_du_for_deg_at_du_kommer_til_a_fullfore_dette_studiet,
@@ -194,7 +194,8 @@ OM_prepare_exchangestudents_2024 <- function(innfil = "../datafiler/exchangestud
   if ("do_you_receive_any_assistance_from_oslo_met_in_order_to_meet_your_inclusion_needs" %in% (OM %>% names)) {
     OM <- OM_lag_faktor(OM, do_you_receive_any_assistance_from_oslo_met_in_order_to_meet_your_inclusion_needs, janeiv)
   }
-  OM <- OM_lag_faktor(OM, gender, c("Female", "Male", "Other", "Do not wish to answer"))
+  # Kjønn tatt ut som variabel H2025
+  # OM <- OM_lag_faktor(OM, gender, c("Female", "Male", "Other", "Do not wish to answer"))
   OM <- OM_lag_faktor(OM, what_is_your_age, c("Under 21 years", "21-24 years","25-30 years", "31-40 years", "Do not wish to answer"))
   
   # OM <- OM %>% OM_janei_bin_nyvar(svar = did_you_use_the_course_catalogue_on_oslomet_no_before_deciding_what_courses_you_wanted_to_apply_for,
@@ -281,6 +282,7 @@ SB_prepare_2024 <- function(innfil, dataår, instnr, kopleprogramdata = T, brukP
   OM <- OM_null_til_en_indeksering(OM, bruker_ki_23)
   OM <- SB_add_sum_tid(OM)
   OM <- SB_prep_indeks(OM)
+  OM <- SB_campus_oppmøte(OM)
   return(OM)
 } 
 
@@ -330,6 +332,7 @@ SB_prepare_2024_med_DBH <- function(innfil, dataår, instnr, kopleprogramdata = 
   OM <- OM_null_til_en_indeksering(OM, bruker_ki_23)
   OM <- SB_add_sum_tid(OM)
   OM <- SB_prep_indeks(OM)
+  OM <- SB_campus_oppmøte(OM)
   return(OM)
 } 
 
@@ -666,7 +669,7 @@ dbh_hent_programdata <- function(instnr = "1175") {
                 "Nivåkode", 
                 "Årstall", 
                 "Andel av heltid", 
-                # "Andel praksis",
+                "Andel praksis",
                 "Tilbys til",
                 "Studiepoeng")
   dbh_programdata <- dbh_data(347, 
@@ -849,6 +852,12 @@ OM_hent_instituttliste <- function() {
   read_excel("base/OsloMet_instituttvariabler.xlsx", col_types = "text")
   
 }
+
+# hentar programdata i nedlasta fil frå DBH
+OM_hent_programdata <- function() {
+  read_excel("base/DBH_programdata.xlsx", col_types = "text")  
+}
+
 ##** 
 ##* Kodar om Studieprogramkode, for å kunne vise eldre data saman med nytt program
 ##* vis_samla_kode gir moglegheit til å velje å vise berre nyaste studieprogramkode, eller samanslått
@@ -965,6 +974,8 @@ OM_add_bakgrunnsdata <- function(sdf, varnamn) {
     grepl("YFL", .data[[varnamn]]) ~ "YLU",
     grepl("MAFYS", .data[[varnamn]]) ~ "RHT",
     grepl("MAPO", .data[[varnamn]]) ~ "SHA",
+    grepl("MAPSYH", .data[[varnamn]]) ~ "SHA",
+    grepl("SYKD", .data[[varnamn]]) ~ "SHA",
     T ~ Institutt
   ))
   
@@ -1152,23 +1163,25 @@ SB_prep_indeks <- function(sdf) {
   sdf$mis_underv4 <- SB_add_countmiss(sdf, var_underv)
   sdf$indx_underv4[which(sdf$mis_underv4 > 1)] <- NA
   
-  sdf$indx_tilbveil4 <- SB_add_indx_m(sdf, var_tilbveil)
-  sdf$mis_tilbveil4 <- SB_add_countmiss(sdf, var_tilbveil)
-  sdf$indx_tilbveil4[which(sdf$mis_tilbveil4 > 1)] <- NA
+  sdf$indx_tilbveil3 <- SB_add_indx_m(sdf, var_tilbveil)
+  sdf$mis_tilbveil3 <- SB_add_countmiss(sdf, var_tilbveil)
+  sdf$indx_tilbveil3[which(sdf$mis_tilbveil3 > 0)] <- NA
   
   sdf$indx_psymiljo3 <- SB_add_indx_m(sdf, var_psymiljo)
   sdf$mis_psymiljo3 <- SB_add_countmiss(sdf, var_psymiljo)
   sdf$indx_psymiljo3[which(sdf$mis_psymiljo3 > 0)] <- NA  
   
+  # endra i 2025 til 3 spm, endra variabelnamn og grense for missing
   try(expr = {
-    sdf$indx_fysmiljo4 <- SB_add_indx_m(sdf, var_fysmiljo)
-    sdf$mis_fysmiljo4 <- SB_add_countmiss(sdf, var_fysmiljo)
-    sdf$indx_fysmiljo4[which(sdf$mis_fysmiljo4 > 1)] <- NA  
+    sdf$indx_fysmiljo3 <- SB_add_indx_m(sdf, var_fysmiljo)
+    sdf$mis_fysmiljo3 <- SB_add_countmiss(sdf, var_fysmiljo)
+    sdf$indx_fysmiljo3[which(sdf$mis_fysmiljo3 > 0)] <- NA
   }, silent = TRUE)
   
-  sdf$indx_organ4 <- SB_add_indx_m(sdf, var_organ)
-  sdf$mis_organ4 <- SB_add_countmiss(sdf, var_organ)
-  sdf$indx_organ4[which(sdf$mis_organ4 > 1)] <- NA  
+  # endra i 2025 til 3 spm, endra variabelnamn og grense for missing
+  sdf$indx_organ3 <- SB_add_indx_m(sdf, var_organ)
+  sdf$mis_organ3 <- SB_add_countmiss(sdf, var_organ)
+  sdf$indx_organ3[which(sdf$mis_organ3 > 0)] <- NA  
   
   sdf$indx_vurd4 <- SB_add_indx_m(sdf, var_vurd)
   sdf$mis_vurd4 <- SB_add_countmiss(sdf, var_vurd)
@@ -1199,10 +1212,11 @@ SB_prep_indeks <- function(sdf) {
   # }, silent = TRUE)
   
   # Endra i 2024
+  # endra i 2025 til 6 spm, endra variabelnamn og grense for missing
   try(expr = {
-    sdf$indx_praksis7 <- SB_add_indx_m(sdf, var_praksis)
-    sdf$mis_praksis7 <- SB_add_countmiss(sdf, var_praksis)
-    sdf$indx_praksis7[which(sdf$mis_praksis7 > 3)] <- NA
+    sdf$indx_praksis6 <- SB_add_indx_m(sdf, var_praksis)
+    sdf$mis_praksis6 <- SB_add_countmiss(sdf, var_praksis)
+    sdf$indx_praksis6[which(sdf$mis_praksis6 > 2)] <- NA
   }, silent = TRUE)
   
   try(expr = {
@@ -1249,7 +1263,6 @@ SB_prep_indeks <- function(sdf) {
 SB_plan_fullføring <- function(sdf) {
   if ("plan_gjennomforing_23" %!in% colnames(sdf)) {
     sdf <- sdf %>% mutate(plan_gjennomforing_23 = NA)
-    return(sdf)
   }
   sdf <- sdf %>% mutate(plan_gjennomforing_23_omkoda = case_when(
     plan_gjennomforing_23 == 1 |
@@ -1259,6 +1272,25 @@ SB_plan_fullføring <- function(sdf) {
     plan_gjennomforing_23 == 4 |
     plan_gjennomforing_23 == 6 ~ 0,
     plan_gjennomforing_23 == 9999 ~ NaN
+  ))
+}
+
+
+##**
+##* Kodar om frå faktor til middelverdiar av tal på dagar, til bruk i utrekning av gjennomsnitt.
+##* Spørsmålet kom inn i 2025, og gjekk berre til dei som oppgav at studietilbodet blir tilbode regelmessig fysisk
+SB_campus_oppmøte <- function(sdf) {
+  if ("campus_oppmote_25" %!in% colnames(sdf)) {
+    sdf <- sdf %>% mutate(campus_oppmote_25 = NA)
+  }
+  sdf <- sdf %>% mutate(campus_oppmote_25_omkoda = case_when(
+    campus_oppmote_25 == 1 ~ 5,
+    campus_oppmote_25 == 2 ~ 3.5,
+    campus_oppmote_25 == 3 ~ 1.5, 
+    # campus_oppmote_25 == 4 ~ NA, - ingenting koda til 4
+    campus_oppmote_25 == 5 ~ 0.5,
+    campus_oppmote_25 == 6 ~ 0,
+    campus_oppmote_25 == 9999 ~ NaN
   ))
 }
 
@@ -2432,11 +2464,11 @@ var_underv <- c(
 var_tilbveil <- c(
   "tilbveil_antall_16",
   "tilbveil_konstru_13",
-  "tilbveil_student_18",
+  # "tilbveil_student_18", fjerna i 2025
   "tilbveil_fagdisk_18"
 )
 # indx_tilbveil <- c(
-#   "indx_tilbveil4"
+#   "indx_tilbveil3"
 # )
 
 # Faglig og sosialt læringsmiljø
@@ -2451,10 +2483,11 @@ var_psymiljo <- c(
 # )
 
 # indeks Fysisk læringsmiljø
-# NOKUT-indeks: "indeks_fysmiljo_13"
+# NOKUT-indeks: "indeks_fysmiljo_13" - fire spørsmål
+# indeks_fysmiljo_25 - tre spørsmål
 var_fysmiljo <- c(
   "miljo_lokaler_13",
-  "miljo_utstyr_13",
+  # "miljo_utstyr_13", # fjerna i 2025
   "miljo_biblio_13",
   "miljo_ikt_13"
 )
@@ -2463,9 +2496,10 @@ var_fysmiljo <- c(
 # )
 
 # Organisering
-# NOKUT-indeks: "indeks_organ_17"
+# NOKUT-indeks: "indeks_organ_17" - fire spørsmål
+# Endra i 2025: indeks_organ_25 - tre spørsmål
 var_organ <- c(
-  "organ_tilgjinfo_17",
+  # "organ_tilgjinfo_17", # fjerna i 2025
   "organ_kvalinfo_17",
   "organ_admtilr_17",
   "organ_fagligsam_17"
@@ -2576,8 +2610,10 @@ var_tidsbruk <- c(
 #   "sum_tid"
 # )
 # Praksis - endra i 2020
+# indeks_praksis_20 - 7 spørsmål
+# Endra i 2025: indeks_praksis_25 - 6 spørsmål
 var_praksis <- c(
-  "praksis_inf_19", # lagt til 2024 for å levere tal til Styringsportalen
+  # "praksis_inf_19", # fjerna i 2025, var lagt til 2024 for å levere tal til Styringsportalen
   "praksis_forber_14",
   "praksis_passetinn_19",
   "praksis_veil_20",

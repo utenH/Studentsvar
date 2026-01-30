@@ -112,9 +112,9 @@ SB_til_hypergene <- function(datasett, utklipp = T, utklippsstorleik = "") {
     Antall_Svarende = sum(!is.na(overord_altialt_13)),
     Studie_Læringsmiljø = mean(indx_psymiljo3, na.rm = T),
     Undervisning = mean(indx_underv4, na.rm = T),
-    Faglig_veiledning = mean(indx_tilbveil4, na.rm = T),
-    Organisering = mean(indx_organ4, na.rm = T),
-    Praksis = mean(indx_praksis7, na.rm = T),
+    Faglig_veiledning = mean(indx_tilbveil3, na.rm = T), # Eit spm fjerna i 2025
+    Organisering = mean(indx_organ3, na.rm = T), # Eit spm fjerna i 2025
+    Praksis = mean(indx_praksis6, na.rm = T), # Eit spm fjerna i 2025
     Læringsutbytte = mean(indx_laerutb10, na.rm = T),
     Overordnet_Tilfredshet = mean(overord_altialt_13, na.rm = T),
     Medvirkning = mean(medvirk_innspill_18, na.rm = T)
@@ -162,7 +162,7 @@ SB_til_hypergene <- function(datasett, utklipp = T, utklippsstorleik = "") {
 ##* - Institusjon
 ##* - Institutt
 ##* - Studieprogram_instnamn_ar
-OM_indikator_print_2023 <- function(sdf, malfil = "", survey = "test", aggregert = F, part = "") {
+OM_indikator_print_2023 <- function(sdf, malfil = "", survey = "test", aggregert = F, instituttrapport = F, part = "") {
   # TODO: test at datasettet har variablane som trengst, eller print kva som manglar og stopp
   # loop gjennom fakultet, ein eigen for aggregert
   
@@ -390,7 +390,7 @@ OM_indikator_print_2023 <- function(sdf, malfil = "", survey = "test", aggregert
   } # END print_aggregert
   
   print_groups <- function() {
-    if (aggregert) {
+    if (aggregert & !instituttrapport) {
       # Utskrift av fakultet og OsloMet-nivå
       # Test å bruke ein intern funksjon her
       # print_aggregert() 
@@ -471,17 +471,21 @@ OM_indikator_print_2023 <- function(sdf, malfil = "", survey = "test", aggregert
       saveWorkbook(wb = arbeidsbok,
                    file = rapportfil,
                    overwrite = TRUE)
-    } else if (instituttrapport) {
+    } else if (aggregert & instituttrapport) {
       # Utskrift av institutt, fakultet og OsloMet-nivå
       # Test å bruke ein intern funksjon her
       # print_aggregert() 
       
-      # lag ny arbeidsbok sn == arknummer
-      sn <- 1
-      arbeidsbok <- createWorkbook()
+      # # lag ny arbeidsbok sn == arknummer
+      # sn <- 1
+      # arbeidsbok <- createWorkbook()
       
       # loop gjennom rad for rad, legg til fane i arbeidsbok
       for (rad in seq(from = 1, nrow((utskriftsmal)))) {
+        # TODO plassert feil i loop, må vere ein ytre loop som gjer dette for kvart fakultet
+        # lag ny arbeidsbok sn == arknummer
+        sn <- 1
+        arbeidsbok <- createWorkbook()
         # sr = radnummer
         sr <- 1
         # sc = kolonnenummer
@@ -521,50 +525,66 @@ OM_indikator_print_2023 <- function(sdf, malfil = "", survey = "test", aggregert
           df_ut_OM <- print_snitt_as_num_serie(sdf_full %>% group_by(Institusjon), utskriftsmal[rad, "Variabel"], "undersokelse_ar")
         }
         
-        # Instituttnivå
-        # Snur tabellen for å få rett rekkefølgje i graf
-        # df_ut_fakultet <- df_ut_fakultet %>% arrange(desc(across(1)))
+        # TODO plassert feil i loop
+        # Lage liste til å lagre arbeidsbøker i
+        arbeidsbok_splitta <- list()
+        # Lage gruppert liste over fakultet og institutt
+        fakinst <- sdf_full %>% select(Fakultetsnavn, Institutt) %>% unique() %>% group_by(Fakultetsnavn) %>% group_split()
         
-        writeData(arbeidsbok, sheet = sn, x = df_ut_institutt, startCol = sc, startRow = sr, colNames = T, keepNA = T)
-        sr <- sr + nrow(df_ut_institutt) + 1
-        
-        # Fakultetsnivå
-        # Snur tabellen for å få rett rekkefølgje i graf
-        # df_ut_fakultet <- df_ut_fakultet %>% arrange(desc(across(1)))
-        
-        # writeData(arbeidsbok, sheet = sn, x = df_ut_fakultet, startCol = sc, startRow = sr, colNames = T, keepNA = T)
-        # sr <- sr + nrow(df_ut_fakultet) + 1
-        
-        # OsloMet-nivå
-        # Snur tabellen for å få rett rekkefølgje i graf
-        # df_ut_OM <- df_ut_OM %>% arrange(desc(across(1)))
-        writeData(arbeidsbok, sheet = sn, x = df_ut_OM, startCol = sc, startRow = sr, colNames = F, keepNA = T)
-        
-        # Formater breidde første kolonne
-        setColWidths(
-          arbeidsbok,
-          sn,
-          cols = 1,
-          widths = 45
-        )
-        
-        # gjer klar til neste ark
-        sn <- sn + 1
-        
-        # Til bruk i formatering - om det er snitt eller prosent, f.eks.
-        if (F) {
+        # Loope gjennom lista, og filtrere datasett med instituttresultat
+        for (n in fakinst) {
+          df_ut_institutt_tmp <- df_ut_institutt %>% filter(grepl(n[[2]] %>% paste(collapse = "|"), .[[1]]))
           
-        } 
+          # Instituttnivå
+          # Snur tabellen for å få rett rekkefølgje i graf
+          # df_ut_fakultet <- df_ut_fakultet %>% arrange(desc(across(1)))
+          writeData(arbeidsbok, sheet = sn, x = df_ut_institutt_tmp, startCol = sc, startRow = sr, colNames = T, keepNA = T)
+          sr <- sr + nrow(df_ut_institutt_tmp) + 1
+          print(sn)
+          
+          # Fakultetsnivå
+          # Snur tabellen for å få rett rekkefølgje i graf
+          # df_ut_fakultet <- df_ut_fakultet %>% arrange(desc(across(1)))
+          
+          # writeData(arbeidsbok, sheet = sn, x = df_ut_fakultet, startCol = sc, startRow = sr, colNames = T, keepNA = T)
+          # sr <- sr + nrow(df_ut_fakultet) + 1
+          
+          # OsloMet-nivå
+          # Snur tabellen for å få rett rekkefølgje i graf
+          # df_ut_OM <- df_ut_OM %>% arrange(desc(across(1)))
+          writeData(arbeidsbok, sheet = sn, x = df_ut_OM, startCol = sc, startRow = sr, colNames = F, keepNA = T)
+          
+          # Formater breidde første kolonne
+          setColWidths(
+            arbeidsbok,
+            sn,
+            cols = 1,
+            widths = 45
+          )
+          
+          # Til bruk i formatering - om det er snitt eller prosent, f.eks.
+          if (F) {
+            
+          }
+          
+        }
       } # END LOOP
+      arbeidsbok_splitta <- arbeidsbok_splitta %>% append(arbeidsbok)
       
-      # Lagre arbeidsbok    
+      # Lagre arbeidsbøker    
       # rapportfil <- paste0(surveyinfo, "/", "aggregert", " ",  survey, " ", arstal_siste, ".xlsx")
-      rapportfil <- paste0(surveyinfo, "/", "aggregert", " ", paste(survey, part), arstal_siste, ".xlsx")
-      print(rapportfil)
-      saveWorkbook(wb = arbeidsbok,
-                   file = rapportfil,
-                   overwrite = TRUE)
-      
+      faknr <- 1
+      return(arbeidsbok_splitta)
+      for (n in arbeidsbok_splitta) {
+        fakid <- fakinst[[faknr]][[1,1]]
+        print(fakid)
+        rapportfil <- paste0(surveyinfo, "/", "aggregert", " ", paste(survey, part, fakid, " "), arstal_siste, ".xlsx")
+        print(rapportfil)
+        saveWorkbook(wb = n,
+                     file = rapportfil,
+                     overwrite = TRUE)
+        faknr <- faknr + 1
+      }
     } else {
       # loopar gjennom fakultet, skriv ut arbeidsbok
       for (fakultet in sdf$Fakultetsnavn %>% unique %>% sort) {
@@ -711,7 +731,7 @@ OM_indikator_print_2023 <- function(sdf, malfil = "", survey = "test", aggregert
             
           } 
         } # END LOOP
-        
+        return("hei")
         # Lagre arbeidsbok    
         # rapportfil <- paste0(surveyinfo, "/", fakultet, " ",  survey, " ", paste(survey, part), arstal_siste, ".xlsx")
         rapportfil <- paste0(surveyinfo, "/", paste(fakultet, survey, part), arstal_siste, ".xlsx")
